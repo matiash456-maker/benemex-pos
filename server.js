@@ -8,6 +8,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// RUTAS PARA SERVIR LAS PÁGINAS HTML
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/catalogo', (req, res) => {
+  res.sendFile(path.join(__dirname, 'catalogo.html'));
+});
+
 // HELPER FORMATO MÉTODO DE REEMBOLSO
 function formatMetodoReembolso(met) {
   if (!met) return 'Efectivo';
