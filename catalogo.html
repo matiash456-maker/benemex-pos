@@ -19,7 +19,7 @@
     .btn-clear { padding: 10px 15px; background: #f39c12; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
     .btn-clear:hover { background: #d35400; }
 
-    .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+    .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; min-height: 300px; }
     .product-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }
     .product-card:hover { transform: translateY(-3px); }
     
@@ -37,6 +37,16 @@
     .badge-agotado { background-color: #e74c3c; }
     
     .no-results { grid-column: 1 / -1; text-align: center; padding: 40px; color: #7f8c8d; font-size: 1.1rem; }
+
+    /* SECCIÓN CANALES DE CONTACTO (FOOTER) */
+    footer { background-color: #2c3e50; color: white; padding: 25px 20px; border-radius: 8px; text-align: center; margin-top: 30px; }
+    footer h3 { font-size: 1.2rem; margin-bottom: 15px; font-weight: bold; }
+    .social-links { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    .btn-social { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 25px; color: white; text-decoration: none; font-weight: bold; font-size: 0.9rem; transition: transform 0.2s, opacity 0.2s; }
+    .btn-social:hover { transform: translateY(-2px); opacity: 0.9; }
+    .btn-ws { background-color: #25D366; }
+    .btn-ig { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
+    .btn-tt { background-color: #000000; border: 1px solid #444; }
   </style>
 </head>
 <body>
@@ -71,6 +81,21 @@
   <div id="catalog-grid" class="catalog-grid">
     <!-- Carga dinámica de productos -->
   </div>
+
+  <footer>
+    <h3>Nuestros Canales de Contacto</h3>
+    <div class="social-links">
+      <a href="https://wa.me/" target="_blank" class="btn-social btn-ws">
+        💬 WhatsApp
+      </a>
+      <a href="https://www.instagram.com/" target="_blank" class="btn-social btn-ig">
+        📸 Instagram
+      </a>
+      <a href="https://www.tiktok.com/@benemexhome1?_r=1&_t=ZS-99vsEBMzuAZ" target="_blank" class="btn-social btn-tt">
+        🎵 TikTok
+      </a>
+    </div>
+  </footer>
 
   <script>
     const API = '/api';
