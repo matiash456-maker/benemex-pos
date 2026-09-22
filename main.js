@@ -1,6 +1,11 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
+// Desactivar aceleración por hardware y GPU a nivel de línea de comandos
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.disableHardwareAcceleration();
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -9,12 +14,12 @@ function createWindow() {
     icon: path.join(__dirname, 'logo-home-cut.jpg'),
     autoHideMenuBar: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true
     }
   });
 
-  // Carga la interfaz local conectada a Render
   win.loadFile('index.html');
 }
 
