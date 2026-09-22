@@ -43,6 +43,27 @@
 </head>
 <body>
 
+  <!-- MODAL DE DIÁLOGOS PERSONALIZADOS (REEMPLAZO DE ALERT / CONFIRM / PROMPT) -->
+  <div id="custom-modal-dialog" class="modal" style="z-index: 9999;">
+    <div class="card" style="width: 420px; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.3);">
+      <h3 id="custom-modal-title" style="margin-bottom: 12px; color: #2c3e50;">Aviso</h3>
+      <p id="custom-modal-msg" style="margin-bottom: 15px; color: #555; white-space: pre-wrap; font-size: 0.95rem;"></p>
+      
+      <div id="custom-modal-input-container" style="margin-bottom: 15px; display: none;">
+        <input type="text" id="custom-modal-input" placeholder="" style="width: 100%; padding: 8px;">
+      </div>
+      
+      <div id="custom-modal-select-container" style="margin-bottom: 15px; display: none;">
+        <select id="custom-modal-select" style="width: 100%; padding: 8px;"></select>
+      </div>
+      
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button id="custom-modal-btn-cancel" class="btn btn-warning" style="display: none; flex: 1;">Cancelar</button>
+        <button id="custom-modal-btn-ok" class="btn btn-primary" style="flex: 1;">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-caja" class="modal">
     <div class="card" style="width: 380px; text-align:center;">
       <img src="logo-home-cut.jpg" alt="Benemex Home Logo" style="max-width: 220px; width: 100%; height: auto; margin-bottom: 15px; border-radius: 8px;">
@@ -71,7 +92,7 @@
     <button class="tab-btn" onclick="mostrarPestana('tab-pedidos', this); cargarPedidos();">📦 Pedidos Logística</button>
     <button class="tab-btn" onclick="mostrarPestana('tab-devoluciones', this); cargarDevoluciones();">🔄 Devoluciones</button>
     <button class="tab-btn" onclick="mostrarPestana('tab-cierre', this); cargarReportes();">📊 Cierre de Caja</button>
-    <a href="http://localhost:3000/catalogo.html" target="_blank" class="tab-btn" style="text-decoration:none; color:#2980b9;">🌐 Catálogo Público ↗</a>
+    <a href="https://benemex-pos.onrender.com/catalogo.html" target="_blank" class="tab-btn" style="text-decoration:none; color:#2980b9;">🌐 Catálogo Público ↗</a>
   </div>
 
   <!-- PESTAÑA VENTAS -->
@@ -521,13 +542,98 @@
     document.getElementById('mes-filtro').value = new Date().toISOString().slice(0,7);
     setInterval(() => document.getElementById('hora-actual').innerText = new Date().toLocaleString(), 1000);
 
+    // SISTEMA ASÍNCRONO DE MODALES HTML PARA REEMPLAZAR DIÁLOGOS NATIVOS
+    function customAlert(msg, title = "Aviso") {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal-dialog');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-msg').innerText = msg;
+        document.getElementById('custom-modal-input-container').style.display = 'none';
+        document.getElementById('custom-modal-select-container').style.display = 'none';
+        document.getElementById('custom-modal-btn-cancel').style.display = 'none';
+        
+        const btnOk = document.getElementById('custom-modal-btn-ok');
+        btnOk.onclick = () => {
+          modal.style.display = 'none';
+          resolve();
+        };
+        modal.style.display = 'flex';
+      });
+    }
+
+    function customConfirm(msg, title = "Confirmación") {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal-dialog');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-msg').innerText = msg;
+        document.getElementById('custom-modal-input-container').style.display = 'none';
+        document.getElementById('custom-modal-select-container').style.display = 'none';
+        
+        const btnOk = document.getElementById('custom-modal-btn-ok');
+        const btnCancel = document.getElementById('custom-modal-btn-cancel');
+        btnCancel.style.display = 'block';
+
+        btnOk.onclick = () => { modal.style.display = 'none'; resolve(true); };
+        btnCancel.onclick = () => { modal.style.display = 'none'; resolve(false); };
+        modal.style.display = 'flex';
+      });
+    }
+
+    function customPrompt(msg, defaultValue = "", title = "Ingreso de datos") {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal-dialog');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-msg').innerText = msg;
+        
+        const inputContainer = document.getElementById('custom-modal-input-container');
+        const input = document.getElementById('custom-modal-input');
+        inputContainer.style.display = 'block';
+        input.value = defaultValue;
+
+        document.getElementById('custom-modal-select-container').style.display = 'none';
+        
+        const btnOk = document.getElementById('custom-modal-btn-ok');
+        const btnCancel = document.getElementById('custom-modal-btn-cancel');
+        btnCancel.style.display = 'block';
+
+        btnOk.onclick = () => { modal.style.display = 'none'; resolve(input.value); };
+        btnCancel.onclick = () => { modal.style.display = 'none'; resolve(null); };
+        modal.style.display = 'flex';
+        setTimeout(() => input.focus(), 100);
+      });
+    }
+
+    function customSelectPrompt(msg, options, title = "Selección") {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal-dialog');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-msg').innerText = msg;
+        
+        document.getElementById('custom-modal-input-container').style.display = 'none';
+        
+        const selectContainer = document.getElementById('custom-modal-select-container');
+        const select = document.getElementById('custom-modal-select');
+        selectContainer.style.display = 'block';
+        select.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+
+        const btnOk = document.getElementById('custom-modal-btn-ok');
+        const btnCancel = document.getElementById('custom-modal-btn-cancel');
+        btnCancel.style.display = 'block';
+
+        btnOk.onclick = () => { modal.style.display = 'none'; resolve(select.value); };
+        btnCancel.onclick = () => { modal.style.display = 'none'; resolve('efectivo'); };
+        modal.style.display = 'flex';
+      });
+    }
+
     function parseImg(url) { if (!url) return ''; const match = url.match(/[-\w]{25,}/); return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url; }
 
-    function obtenerMetodoReembolso() {
-      const opt = prompt("Seleccione el medio de devolución:\n1. Efectivo\n2. Transferencia\n3. Tarjeta", "1");
-      if (opt === "2") return "transferencia";
-      if (opt === "3") return "tarjeta";
-      return "efectivo";
+    async function obtenerMetodoReembolso() {
+      return await customSelectPrompt("Seleccione el medio de devolución:", [
+        { value: "efectivo", label: "1. Efectivo" },
+        { value: "transferencia", label: "2. Transferencia" },
+        { value: "tarjeta", label: "3. Tarjeta" }
+      ], "Medio de Reembolso");
     }
 
     async function checkCaja() {
@@ -535,16 +641,20 @@
       if(c.estado === 'cerrada') document.getElementById('modal-caja').style.display = 'flex';
       else document.getElementById('caja-header-info').innerText = `Turno a cargo de: ${c.personal}`;
     }
+
     async function abrirCaja() {
       const p = document.getElementById('caja-personal').value || 'Personal Desconocido';
       const m = parseFloat(document.getElementById('caja-inicial').value);
-      if(isNaN(m)) return alert('Ingresa un monto válido');
+      if(isNaN(m)) return await customAlert('Ingresa un monto válido');
       await fetch(`${API}/caja/abrir`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({monto_inicial:m, personal:p})});
-      document.getElementById('modal-caja').style.display = 'none'; alert('¡Turno Abierto!'); checkCaja();
+      document.getElementById('modal-caja').style.display = 'none'; 
+      await customAlert('¡Turno Abierto!'); 
+      checkCaja();
     }
+
     async function verificarCierreCaja() {
       const m = parseFloat(document.getElementById('caja-final').value);
-      if(isNaN(m)) return alert('Ingresa el monto final físico.');
+      if(isNaN(m)) return await customAlert('Ingresa el monto final físico.');
       const r = await fetch(`${API}/caja/pre-cierre`); const data = await r.json(); 
       const diff = data.esperado < 0 ? (m + data.esperado) : (m - data.esperado);
       
@@ -553,7 +663,7 @@
       else if (diff < 0) msg += `🔴 FALTANTE DE CAJA: $${Math.abs(diff).toFixed(2)}\n`;
       else msg += `✅ LA CAJA CUADRA A LA PERFECCIÓN (SALDO CORRECTO).\n`;
       
-      if(confirm(msg + `\n¿Estás de acuerdo en finalizar el turno con estos valores?`)) {
+      if(await customConfirm(msg + `\n¿Estás de acuerdo en finalizar el turno con estos valores?`)) {
         await fetch(`${API}/caja/cerrar`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({monto_final: m, esperado: data.esperado})});
         document.getElementById('caja-final').value = ''; checkCaja(); cargarReportes();
       }
@@ -635,12 +745,13 @@
       data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItem('${tipo}', ${p.id}, '${p.nombre}', ${p.precio}, '${p.imagen||''}', ${p.stock})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio}) [Stock: ${p.stock}]</div>`; });
       box.style.display = 'block';
     }
-    function agregarItem(tipo, id, nombre, precio, imagen, stockActual) {
+
+    async function agregarItem(tipo, id, nombre, precio, imagen, stockActual) {
       const c = carritos[tipo]; const ex = c.find(i => i.id === id);
       const nuevaCant = ex ? ex.cant + 1 : 1;
       
       if(nuevaCant > stockActual) {
-        if(!confirm(`⚠️ EL PRODUCTO SUPERA EL STOCK DISPONIBLE (Stock actual: ${stockActual}).\n\n¿Deseas Pedir por encima del Stock?`)) {
+        if(!await customConfirm(`⚠️ EL PRODUCTO SUPERA EL STOCK DISPONIBLE (Stock actual: ${stockActual}).\n\n¿Deseas Pedir por encima del Stock?`)) {
           return;
         }
       }
@@ -648,6 +759,7 @@
       if(ex) ex.cant++; else c.push({id, nombre, precio, imagen, cant: 1, stockActual});
       document.getElementById(`sug-${tipo}`).style.display = 'none'; document.getElementById(`buscar-${tipo}`).value = ''; renderCarrito(tipo);
     }
+
     function renderCarrito(tipo) {
       const tbody = document.getElementById(`tabla-${tipo}`); tbody.innerHTML = '';
       carritos[tipo].forEach((i, idx) => {
@@ -673,10 +785,13 @@
     }
 
     async function cobrarVenta() {
-      if(carritos.venta.length === 0) return; const l = calcV(); if (Math.abs(l.falta) > 0.01) return alert('El monto debe cubrirse exacto.');
-      const cNom = prompt('Nombre del cliente para el registro (Dejar vacío si es mostrador general):') || 'Venta de Mostrador';
+      if(carritos.venta.length === 0) return; const l = calcV(); 
+      if (Math.abs(l.falta) > 0.01) return await customAlert('El monto debe cubrirse exacto.');
+      const resName = await customPrompt('Nombre del cliente para el registro (Dejar vacío si es mostrador general):');
+      const cNom = resName || 'Venta de Mostrador';
       await fetch(`${API}/ventas`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cliente_nombre: cNom, items: carritos.venta.map(i => ({producto_id: i.id, cantidad: i.cant, precio: i.precio})), subtotal: carritos.venta.reduce((a,i)=>a+(i.precio*i.cant),0), descuento: l.descMonto, pago_efectivo: l.tEf, pago_tarjeta: l.tTa, pago_transferencia: l.tTr, pago_qr: l.tQr, total: l.total})});
-      carritos.venta = []; renderCarrito('venta'); resetCamposSplit('v'); cargarHistorialVentas(); cargarReportes(); alert('¡Venta cerrada con éxito!');
+      carritos.venta = []; renderCarrito('venta'); resetCamposSplit('v'); cargarHistorialVentas(); cargarReportes(); 
+      await customAlert('¡Venta cerrada con éxito!');
     }
 
     function toggleEnvio() {
@@ -695,7 +810,7 @@
     }
 
     async function cobrarPedido() {
-      if(carritos.pedido.length === 0) return alert('No hay productos cargados en el pedido.'); const l = calcP();
+      if(carritos.pedido.length === 0) return await customAlert('No hay productos cargados en el pedido.'); const l = calcP();
       const sobreStock = carritos.pedido.some(i => i.cant > i.stockActual);
       
       const p = { 
@@ -720,7 +835,8 @@
       await fetch(`${API}/pedidos`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
       carritos.pedido = []; renderCarrito('pedido');
       ['ped-codigo','ped-cliente','ped-telefono','ped-dni','p-provincia','p-localidad','p-cp','p-direccion-domicilio'].forEach(id => document.getElementById(id).value = '');
-      document.getElementById('p-tipo-entrega').value = 'local'; toggleEnvio(); resetCamposSplit('p'); cargarPedidos(); cargarHistorialVentas(); cargarReportes(); alert('Pedido guardado exitosamente.');
+      document.getElementById('p-tipo-entrega').value = 'local'; toggleEnvio(); resetCamposSplit('p'); cargarPedidos(); cargarHistorialVentas(); cargarReportes(); 
+      await customAlert('Pedido guardado exitosamente.');
     }
 
     // INVENTARIO Y REINGRESOS FILTRADOS
@@ -765,12 +881,13 @@
       const pid = document.getElementById('reing-prod-id').value;
       const cant = parseInt(document.getElementById('reing-cant').value);
       const det = document.getElementById('reing-detalle').value;
-      if (!pid || isNaN(cant) || cant <= 0) return alert('Por favor selecciona un producto válido y cantidad.');
+      if (!pid || isNaN(cant) || cant <= 0) return await customAlert('Por favor selecciona un producto válido y cantidad.');
       
       await fetch(`${API}/productos/reingreso`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_id: pid, cantidad: cant, detalle: det})});
       document.getElementById('form-reingreso-stock').reset();
       document.getElementById('reing-buscar-prod').disabled = true;
-      cargarInventario(); cargarHistorialReingresos(); alert('Stock sumado con éxito');
+      cargarInventario(); cargarHistorialReingresos(); 
+      await customAlert('Stock sumado con éxito');
     });
 
     function resetFormInventario() {
@@ -825,7 +942,12 @@
       cargarHistorialReingresos();
     }
 
-    async function borrarProd(id) { if(confirm('¿Eliminar permanentemente este registro del inventario?')) { await fetch(`${API}/productos/${id}`, {method:'DELETE'}); cargarInventario(); } }
+    async function borrarProd(id) { 
+      if(await customConfirm('¿Eliminar permanentemente este registro del inventario?')) { 
+        await fetch(`${API}/productos/${id}`, {method:'DELETE'}); 
+        cargarInventario(); 
+      } 
+    }
 
     // EGRESOS EDITABLES
     document.getElementById('form-egreso').addEventListener('submit', async (e) => {
@@ -859,7 +981,12 @@
       document.getElementById('acordeon-egresos').innerHTML = html.join('');
     }
     function toggleCat(catId) { const el = document.getElementById(`cat-${catId}`); el.style.display = el.style.display === 'block' ? 'none' : 'block'; }
-    async function borrarEgreso(id) { if(confirm('¿Seguro de eliminar este registro de egreso?')) { await fetch(`${API}/egresos/${id}`, {method:'DELETE'}); cargarEgresos(); cargarReportes(); } }
+    async function borrarEgreso(id) { 
+      if(await customConfirm('¿Seguro de eliminar este registro de egreso?')) { 
+        await fetch(`${API}/egresos/${id}`, {method:'DELETE'}); 
+        cargarEgresos(); cargarReportes(); 
+      } 
+    }
 
     // HISTORIAL VENTAS DIRECTAS
     async function cargarHistorialVentas() {
@@ -915,12 +1042,12 @@
 
     async function modificarCantidadVenta(detalleId) {
       const nuevaCant = parseInt(document.getElementById(`nueva-cant-venta-${detalleId}`).value);
-      if(isNaN(nuevaCant) || nuevaCant < 0) return alert('Ingresa una cantidad válida.');
+      if(isNaN(nuevaCant) || nuevaCant < 0) return await customAlert('Ingresa una cantidad válida.');
       
       let metReembolso = 'efectivo';
       const detRow = document.getElementById(`nueva-cant-venta-${detalleId}`);
       if (nuevaCant < parseInt(detRow.defaultValue)) {
-        metReembolso = obtenerMetodoReembolso();
+        metReembolso = await obtenerMetodoReembolso();
       }
 
       await fetch(`${API}/ventas/${ventaActiva}/modificar-cantidad`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({detalle_id: detalleId, nueva_cantidad: nuevaCant, metodo_reembolso: metReembolso})});
@@ -941,8 +1068,8 @@
     }
 
     async function devolverVentaTotal() {
-      if(!confirm('¿Estás seguro de devolver y cancelar TODOS los productos de esta venta?')) return;
-      const metReembolso = obtenerMetodoReembolso();
+      if(!await customConfirm('¿Estás seguro de devolver y cancelar TODOS los productos de esta venta?')) return;
+      const metReembolso = await obtenerMetodoReembolso();
       await fetch(`${API}/ventas/${ventaActiva}/devolver-total`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({metodo_reembolso: metReembolso})});
       document.getElementById('modal-venta').style.display = 'none'; cargarHistorialVentas(); cargarInventario(); cargarDevoluciones(); cargarPedidos(); cargarReportes();
     }
@@ -970,6 +1097,7 @@
         return `<tr><td>${codPedStr}<b>${i.cliente_nombre}</b><br><small>Tel: ${i.cliente_telefono||'-'}</small>${obsBadge}</td><td>${loc}</td><td>${badge}</td><td><b>$${i.saldo_pendiente.toFixed(2)}</b></td><td>${btns}</td></tr>`;
       }).join('');
     }
+
     async function verDetallesPedido(id) {
       pedidoActivoModal = id; const r = await fetch(`${API}/pedidos/${id}/detalles`); const data = await r.json();
       if(data.items.length === 0) { document.getElementById('modal-pedido-detalles').style.display = 'none'; return; }
@@ -995,12 +1123,12 @@
 
     async function modificarCantidadPedido(detalleId) {
       const nuevaCant = parseInt(document.getElementById(`nueva-cant-ped-${detalleId}`).value);
-      if(isNaN(nuevaCant) || nuevaCant < 0) return alert('Ingresa una cantidad válida.');
+      if(isNaN(nuevaCant) || nuevaCant < 0) return await customAlert('Ingresa una cantidad válida.');
       
       let metReembolso = 'efectivo';
       const detRow = document.getElementById(`nueva-cant-ped-${detalleId}`);
       if (nuevaCant < parseInt(detRow.defaultValue)) {
-        metReembolso = obtenerMetodoReembolso();
+        metReembolso = await obtenerMetodoReembolso();
       }
 
       await fetch(`${API}/pedidos/${pedidoActivoModal}/modificar-cantidad`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({detalle_id: detalleId, nueva_cantidad: nuevaCant, metodo_reembolso: metReembolso})});
@@ -1009,9 +1137,10 @@
 
     async function buscarSugerenciasEditar(q) { const box = document.getElementById('sug-editar-pedido'); if(q.length < 2) return box.style.display = 'none'; const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = ''; data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAPedido(${p.id}, '${p.nombre}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; }); box.style.display = 'block'; }
     async function agregarItemAPedido(id, nombre, precio) { await fetch(`${API}/pedidos/${pedidoActivoModal}/agregar-item`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_id: id, cantidad: 1, precio: precio})}); document.getElementById('buscar-editar-pedido').value = ''; document.getElementById('sug-editar-pedido').style.display = 'none'; cargarPedidos(); verDetallesPedido(pedidoActivoModal); cargarHistorialVentas(); cargarDevoluciones(); cargarReportes(); cargarInventario(); }
+    
     async function cancelarPedidoTotal(id) { 
-      if(confirm('¿Cancelar TOTALMENTE el pedido? Las unidades regresarían al stock.')) { 
-        const metReembolso = obtenerMetodoReembolso();
+      if(await customConfirm('¿Cancelar TOTALMENTE el pedido? Las unidades regresarían al stock.')) { 
+        const metReembolso = await obtenerMetodoReembolso();
         await fetch(`${API}/pedidos/${id}`, {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({metodo_reembolso: metReembolso})}); 
         document.getElementById('modal-pedido-detalles').style.display = 'none'; 
         cargarPedidos(); cargarHistorialVentas(); cargarDevoluciones(); cargarReportes(); cargarInventario();
@@ -1019,9 +1148,9 @@
     }
     
     function abrirSaldar(id, saldo) { pedidoA_Saldar = id; saldoA_Saldar = saldo; document.getElementById('s-titulo-saldo').innerText = `Saldo base a cubrir: $${saldo.toFixed(2)}`; resetCamposSplit('s'); calcS(); document.getElementById('modal-saldar').style.display = 'flex'; }
-    async function confirmarSaldar() { const l = calcS(); if (Math.abs(l.falta) > 0.01) return alert('Debes cubrir el monto exacto faltante.'); await fetch(`${API}/pedidos/${pedidoA_Saldar}/saldar`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pago_efectivo: l.tEf, pago_tarjeta: l.tTa, pago_transferencia: l.tTr, pago_qr: l.tQr, total_cobrado: l.total})}); document.getElementById('modal-saldar').style.display = 'none'; cargarPedidos(); cargarHistorialVentas(); cargarReportes(); }
+    async function confirmarSaldar() { const l = calcS(); if (Math.abs(l.falta) > 0.01) return await customAlert('Debes cubrir el monto exacto faltante.'); await fetch(`${API}/pedidos/${pedidoA_Saldar}/saldar`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pago_efectivo: l.tEf, pago_tarjeta: l.tTa, pago_transferencia: l.tTr, pago_qr: l.tQr, total_cobrado: l.total})}); document.getElementById('modal-saldar').style.display = 'none'; cargarPedidos(); cargarHistorialVentas(); cargarReportes(); }
     async function cambiarEstadoPed(id, nuevoEstado, tracking='') { await fetch(`${API}/pedidos/${id}/estado`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({estado: nuevoEstado, tracking})}); cargarPedidos(); cargarHistorialVentas(); }
-    function marcarEnviado(id) { const tk = prompt('Si tienes código de seguimiento, ingrésalo ahora:'); cambiarEstadoPed(id, 'enviado', tk||''); }
+    async function marcarEnviado(id) { const tk = await customPrompt('Si tienes código de seguimiento, ingrésalo ahora:'); await cambiarEstadoPed(id, 'enviado', tk||''); }
 
     // HISTORIAL UNIFICADO Y AGRUPADO POR TRANSACCIÓN DE DEVOLUCIONES
     async function cargarDevoluciones() {
