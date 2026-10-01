@@ -817,4 +817,98 @@ app.get('/api/reportes/dashboard', async (req, res) => {
   res.json({ pl: { ventas: v, cogs: c, gastos: g, neta: v - c - g }, prods, gas, ev });
 });
 
+// ENDPOINT PARA INFORME FINANCIERO DETALLADO OPERATIVO
+app.get('/api/reportes/detallado', async (req, res) => {
+  const { desde, hasta, mes } = req.query;
+  let condVentas = "";
+  let condEgresos = "";
+  let paramsV = [];
+  let paramsE = [];
+
+  if (mes) {
+    condVentas = "WHERE strftime('%Y-%m', v.fecha) = ?";
+    condEgresos = "WHERE strftime('%Y-%m', fecha) = ?";
+    paramsV.push(mes);
+    paramsE.push(mes);
+  } else if (desde && hasta) {
+    condVentas = "WHERE DATE(v.fecha) >= ? AND DATE(v.fecha) <= ?";
+    condEgresos = "WHERE DATE(fecha) >= ? AND DATE(fecha) <= ?";
+    paramsV.push(desde, hasta);
+    paramsE.push(desde, hasta);
+  } else {
+    const mesActual = new Date().toISOString().slice(0, 7);
+    condVentas = "WHERE strftime('%Y-%m', v.fecha) = ?";
+    condEgresos = "WHERE strftime('%Y-%m', fecha) = ?";
+    paramsV.push(mesActual);
+    paramsE.push(mesActual);
+  }
+
+  const qVentas = `
+    SELECT v.id as venta_id, v.fecha, v.cliente_nombre, v.subtotal, v.descuento, v.total,
+           v.pago_efectivo, v.pago_tarjeta, v.pago_transferencia, v.pago_qr,
+           dv.cantidad, dv.precio_unitario, dv.costo_unitario,
+           p.nombre as producto_nombre, p.codigo_barras
+    FROM ventas v
+    JOIN detalle_ventas dv ON dv.venta_id = v.id
+    JOIN productos p ON p.id = dv.producto_id
+    ${condVentas}
+    ORDER BY v.fecha DESC
+  `;
+  const ventasRes = await db.execute({ sql: qVentas, args: paramsV });
+
+  const qEgresos = `
+    SELECT * FROM egresos
+    ${condEgresos ? condEgresos + " AND tipo = 'gasto'" : "WHERE tipo = 'gasto'"}
+    ORDER BY fecha DESC
+  `;
+  const egresosRes = await db.execute({ sql: qEgresos, args: paramsE });
+
+  let totalVentas = 0;
+  let totalCostos = 0;
+  const mapaVentas = new Map();
+
+  ventasRes.rows.forEach(r => {
+    if (!mapaVentas.has(r.venta_id)) {
+      mapaVentas.set(r.venta_id, {
+        id: r.venta_id,
+        fecha: r.fecha,
+        cliente: r.cliente_nombre,
+        subtotal: r.subtotal,
+        descuento: r.descuento,
+        total: r.total,
+        pago_efectivo: r.pago_efectivo || 0,
+        pago_tarjeta: r.pago_tarjeta || 0,
+        pago_transferencia: r.pago_transferencia || 0,
+        pago_qr: r.pago_qr || 0,
+        items: []
+      });
+      totalVentas += r.total;
+    }
+
+    totalCostos += (r.cantidad * r.costo_unitario);
+    mapaVentas.get(r.venta_id).items.push({
+      producto: r.producto_nombre,
+      codigo: r.codigo_barras,
+      cantidad: r.cantidad,
+      precio_unitario: r.precio_unitario,
+      costo_unitario: r.costo_unitario,
+      subtotal: r.cantidad * r.precio_unitario
+    });
+  });
+
+  const totalEgresos = egresosRes.rows.reduce((acc, e) => acc + e.monto, 0);
+  const resultadoOperativo = totalVentas - totalCostos - totalEgresos;
+
+  res.json({
+    resumen: {
+      totalVentas,
+      totalCostos,
+      totalEgresos,
+      resultadoOperativo
+    },
+    ventas: Array.from(mapaVentas.values()),
+    egresos: egresosRes.rows
+  });
+});
+
 app.listen(process.env.PORT || 3000, () => console.log('Servidor listo'));
