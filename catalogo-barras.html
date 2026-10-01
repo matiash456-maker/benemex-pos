@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo de Productos y Códigos de Barras - BENEMEX</title>
+  <!-- Librería gratuita para renderizar códigos de barras en SVG -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f6f9; color: #333; padding: 20px; }
+
+    header {
+      background: #2c3e50;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .btn-print {
+      background-color: #27ae60;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-print:hover { background-color: #219150; }
+
+    .grid-catalogo {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 15px;
+    }
+
+    .card-producto {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      page-break-inside: avoid;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .foto-prod {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      flex-shrink: 0;
+    }
+
+    .info-prod {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .nombre-prod {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 3px;
+    }
+
+    .cat-precio {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .precio-tag {
+      color: #27ae60;
+      font-weight: bold;
+    }
+
+    .barcode-container {
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    .barcode-svg {
+      width: 100%;
+      max-height: 45px;
+    }
+
+    /* ESTILOS EXCLUSIVOS PARA IMPRESIÓN Y EXPORTACIÓN A PDF */
+    @media print {
+      body { background: white; padding: 0; }
+      .no-print { display: none !important; }
+      header { display: none !important; }
+      .grid-catalogo {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* 2 columnas parejas por hoja A4 */
+        gap: 10px;
+      }
+      .card-producto {
+        border: 1px solid #ccc;
+        box-shadow: none;
+        padding: 8px;
+      }
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="no-print">
+    <div>
+      <h1>📦 Catálogo Imprimible de Productos con Código de Barras</h1>
+      <p style="font-size: 0.85rem; color: #bdc3c7;">BENEMEX POS - Listo para imprimir o exportar a PDF</p>
+    </div>
+    <button class="btn-print" onclick="window.print()">🖨️ Generar / Guardar como PDF</button>
+  </header>
+
+  <div id="contenedor-catalogo" class="grid-catalogo">
+    <p style="text-align: center; grid-column: 1/-1;">Cargando catálogo e imágenes...</p>
+  </div>
+
+  <script>
+    const API = 'https://benemex-pos.onrender.com/api';
+
+    function parseImg(url) {
+      if (!url) return 'https://via.placeholder.com/80?text=Sin+Foto';
+      const match = url.match(/[-\w]{25,}/);
+      return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
+    }
+
+    async function cargarCatalogo() {
+      try {
+        const res = await fetch(`${API}/productos`);
+        const productos = await res.json();
+        const contenedor = document.getElementById('contenedor-catalogo');
+        contenedor.innerHTML = '';
+
+        if (productos.length === 0) {
+          contenedor.innerHTML = '<p style="grid-column: 1/-1;">No hay productos registrados en el sistema.</p>';
+          return;
+        }
+
+        productos.forEach(p => {
+          const card = document.createElement('div');
+          card.className = 'card-producto';
+
+          card.innerHTML = `
+            <img src="${parseImg(p.imagen)}" class="foto-prod" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/80?text=Sin+Foto'">
+            <div class="info-prod">
+              <div class="nombre-prod">${p.nombre}</div>
+              <div class="cat-precio">
+                <span>Cat: ${p.categoria || 'General'}</span> | 
+                <span class="precio-tag">$${parseFloat(p.precio).toFixed(2)}</span>
+              </div>
+              <div class="barcode-container">
+                <svg id="barcode-${p.id}" class="barcode-svg"></svg>
+              </div>
+            </div>
+          `;
+
+          contenedor.appendChild(card);
+
+          // Genera el código de barras físico en formato CODE128 o EAN/NUMÉRICO
+          if (p.codigo_barras) {
+            JsBarcode(`#barcode-${p.id}`, p.codigo_barras.toString(), {
+              format: "CODE128",
+              width: 1.4,
+              height: 35,
+              fontSize: 12,
+              displayValue: true, // Muestra el código numérico debajo de las barras
+              margin: 0
+            });
+          }
+        });
+
+      } catch (err) {
+        console.error(err);
+        document.getElementById('contenedor-catalogo').innerHTML = '<p style="color:red; grid-column: 1/-1;">Error al conectar con la base de datos.</p>';
+      }
+    }
+
+    // Inicializa la carga del catálogo al abrir
+    cargarCatalogo();
+  </script>
+</body>
+</html>
