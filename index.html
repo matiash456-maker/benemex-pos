@@ -39,6 +39,13 @@
     .egreso-cat { cursor: pointer; background: #ecf0f1; padding: 10px; font-weight: bold; border: 1px solid #bdc3c7; margin-top: 5px; }
     .egreso-det { display: none; padding-left: 20px; border-left: 3px solid #3498db; }
     .filter-bar { display: flex; gap: 10px; background: #eef2f5; padding: 12px; border-radius: 6px; margin-bottom: 15px; align-items: flex-end; flex-wrap: wrap; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #modal-informe-detallado, #modal-informe-detallado * { visibility: visible; }
+      #modal-informe-detallado { position: absolute; left: 0; top: 0; width: 100%; height: auto; background: white; display: block !important; }
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -168,7 +175,7 @@
       <h2 style="margin-bottom:15px; display:flex; justify-content:space-between;">Detalles de Venta <button onclick="document.getElementById('modal-venta').style.display='none'" class="btn btn-danger">X</button></h2>
       <div id="v-detalle-financiero" class="detalle-fin"></div>
       <div id="v-aviso-pedido" style="display:none; background:#f39c12; color:white; padding:10px; border-radius:5px; margin-bottom:15px; font-weight:bold;">
-        ⚠️️ Esta venta proviene de un Pedido de Logística. Para modificar productos o procesar devoluciones debes ir a la sección "Pedidos Logística".
+        ⚠ Esta venta proviene de un Pedido de Logística. Para modificar productos o procesar devoluciones debes ir a la sección "Pedidos Logística".
       </div>
       
       <div id="v-acciones-modificacion">
@@ -524,8 +531,24 @@
     </div>
   </div>
 
-  <!-- PESTAÑA CIERRE -->
+  <!-- PESTAÑA CIERRE Y REPORTES -->
   <div id="tab-cierre" class="tab-content">
+    
+    <!-- TARJETA GENERADORA DE INFORME DETALLADO -->
+    <div class="card" style="border: 2px solid #2980b9;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <h2>📄 Generador de Informe Financiero Operativo</h2>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <small><b>Filtrar por Mes:</b></small>
+          <input type="month" id="inf-mes" style="width: auto; padding: 6px;">
+          <small><b>o Rango de Fechas:</b></small>
+          <input type="date" id="inf-desde" style="width: auto; padding: 5px;">
+          <input type="date" id="inf-hasta" style="width: auto; padding: 5px;">
+          <button class="btn btn-primary" onclick="generarInformeDetallado()" style="margin-bottom:0;">🔍 Generar Informe Detallado</button>
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="text-align:center;">
       <h2 style="color:#e74c3c;">Cierre de Turno de Caja</h2>
       <div style="display:flex; gap:10px; justify-content:center; align-items:flex-end;">
@@ -533,6 +556,7 @@
         <button onclick="verificarCierreCaja()" class="btn btn-danger">Verificar Diferencia y Cerrar</button>
       </div>
     </div>
+
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
         <h2>Historial Completo de Cierres de Caja</h2>
@@ -567,6 +591,7 @@
         <tbody id="tabla-errores-caja"></tbody>
       </table>
     </div>
+
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h2>Estado de Resultados (P&L)</h2>
@@ -579,9 +604,26 @@
         <div><small>Ganancia Neta</small><br><b style="color:#2980b9; font-size:1.5rem" id="pl-neta">$0</b></div>
       </div>
     </div>
+    
     <div class="chart-box"><h2>Top Productos Más Vendidos</h2><canvas id="c-prods"></canvas></div>
     <div class="chart-box"><h2>Distribución de Gastos Reales por Categoría</h2><canvas id="c-gas"></canvas></div>
     <div class="chart-box"><h2>Evolución Diaria (Ingresos vs Gastos)</h2><canvas id="c-ev"></canvas></div>
+  </div>
+
+  <!-- MODAL DEL INFORME DETALLADO -->
+  <div id="modal-informe-detallado" class="modal">
+    <div class="card" style="width: 900px; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" class="no-print">
+        <h2>📊 Estado de Resultados e Informe Operativo Detallado</h2>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="window.print()" class="btn btn-success">🖨️ Imprimir / Guardar PDF</button>
+          <button onclick="document.getElementById('modal-informe-detallado').style.display='none'" class="btn btn-danger">X</button>
+        </div>
+      </div>
+
+      <!-- CONTENIDO DEL INFORME -->
+      <div id="contenido-informe"></div>
+    </div>
   </div>
 
   <script>
@@ -1054,18 +1096,15 @@
       const hasta = document.getElementById('hist-v-hasta')?.value || '';
 
       const filtradas = ventasMemoria.filter(x => {
-        // 1. Filtro por Rango de Fechas
         const fechaV = x.fecha ? x.fecha.split('T')[0] : '';
         if (desde && fechaV < desde) return false;
         if (hasta && fechaV > hasta) return false;
 
-        // 2. Filtro por Categoría
         if (cat) {
           const tieneCat = (x.categoria === cat) || (x.items && x.items.some(i => i.categoria === cat));
           if (!tieneCat) return false;
         }
 
-        // 3. Filtro por Búsqueda (ID Venta, Código Pedido, Nombre Cliente o Producto)
         if (busqueda) {
           const coincideId = String(x.id).toLowerCase().includes(busqueda);
           const coincideCod = x.codigo_pedido && x.codigo_pedido.toLowerCase().includes(busqueda);
@@ -1177,21 +1216,17 @@
       const hasta = document.getElementById('ped-f-hasta')?.value || '';
 
       const filtrados = pedidosMemoria.filter(i => {
-        // 1. Filtro por Rango de Fechas
         const fechaP = i.fecha ? i.fecha.split('T')[0] : '';
         if (desde && fechaP < desde) return false;
         if (hasta && fechaP > hasta) return false;
 
-        // 2. Filtro por Estado de Envío
         if (estado && i.estado !== estado) return false;
 
-        // 3. Filtro por Categoría
         if (cat) {
           const tieneCat = (i.categoria === cat) || (i.items && i.items.some(item => item.categoria === cat));
           if (!tieneCat) return false;
         }
 
-        // 4. Filtro por Búsqueda (Código Pedido, Cliente, DNI, Teléfono o Nombre de Producto)
         if (busqueda) {
           const coincideCod = i.codigo_pedido && i.codigo_pedido.toLowerCase().includes(busqueda);
           const coincideCliente = i.cliente_nombre && i.cliente_nombre.toLowerCase().includes(busqueda);
@@ -1302,6 +1337,116 @@
           <td><b style="color:#e74c3c">-$${i.total_monto.toFixed(2)}</b></td>
           <td><small>${i.detalle_pago}</small></td>
         </tr>`).join('');
+    }
+
+    // GENERADOR DE INFORME FINANCIERO DETALLADO
+    async function generarInformeDetallado() {
+      const mes = document.getElementById('inf-mes').value;
+      const desde = document.getElementById('inf-desde').value;
+      const hasta = document.getElementById('inf-hasta').value;
+
+      let url = `${API}/reportes/detallado?`;
+      if (mes) url += `mes=${mes}`;
+      else if (desde && hasta) url += `desde=${desde}&hasta=${hasta}`;
+      else {
+        const mesActual = new Date().toISOString().slice(0, 7);
+        url += `mes=${mesActual}`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+      const r = data.resumen;
+
+      let html = `
+        <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #fff;">
+          <h2 style="text-align: center; color: #2c3e50; margin-bottom: 5px;">BENEMEX - INFORME OPERATIVO DETALLADO</h2>
+          <p style="text-align: center; color: #666; margin-bottom: 20px;">Fecha de emisión: ${new Date().toLocaleString()}</p>
+          
+          <table style="margin-bottom: 25px; background: #f8fafc;">
+            <thead>
+              <tr style="background: #2c3e50; color: white;">
+                <th colspan="2" style="font-size: 1.1rem; text-align: center;">1. RESUMEN EJECUTIVO DE RESULTADOS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><b>(+) Total Ingresos por Ventas Netas:</b></td><td style="color:#27ae60; font-weight:bold; text-align:right;">$${r.totalVentas.toFixed(2)}</td></tr>
+              <tr><td><b>(-) Costo Directo de Mercadería Vendida (COGS):</b></td><td style="color:#e67e22; font-weight:bold; text-align:right;">-$${r.totalCostos.toFixed(2)}</td></tr>
+              <tr><td><b>(-) Gastos Operativos Reales:</b></td><td style="color:#e74c3c; font-weight:bold; text-align:right;">-$${r.totalEgresos.toFixed(2)}</td></tr>
+              <tr style="font-size: 1.2rem; background: #eef2f5;">
+                <td><b>(=) RESULTADO OPERATIVO NETO:</b></td>
+                <td style="color:${r.resultadoOperativo >= 0 ? '#2980b9' : '#e74c3c'}; font-weight:bold; text-align:right;">$${r.resultadoOperativo.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 style="color: #2c3e50; margin-bottom: 10px;">2. Detalle Itemizado de Ventas</h3>
+      `;
+
+      if (data.ventas.length === 0) {
+        html += `<p style="color:#777; margin-bottom:20px;">No hay ventas registradas en el periodo seleccionado.</p>`;
+      } else {
+        data.ventas.forEach(v => {
+          const metodos = [];
+          if (v.pago_efectivo > 0) metodos.push(`Efectivo: $${v.pago_efectivo.toFixed(2)}`);
+          if (v.pago_tarjeta > 0) metodos.push(`Tarjeta: $${v.pago_tarjeta.toFixed(2)}`);
+          if (v.pago_transferencia > 0) metodos.push(`Transf: $${v.pago_transferencia.toFixed(2)}`);
+          if (v.pago_qr > 0) metodos.push(`QR: $${v.pago_qr.toFixed(2)}`);
+
+          html += `
+            <div style="border: 1px solid #e2e8f0; margin-bottom: 15px; border-radius: 6px; padding: 10px;">
+              <div style="display: flex; justify-content: space-between; background: #eef2f5; padding: 6px 10px; font-weight: bold;">
+                <span>Venta #${v.id} - Cliente: ${v.cliente} (${new Date(v.fecha).toLocaleString()})</span>
+                <span style="color:#27ae60;">Total: $${v.total.toFixed(2)}</span>
+              </div>
+              <p style="font-size: 0.85rem; padding: 5px 10px; color: #555;"><b>Métodos de cobro:</b> ${metodos.join(' | ') || 'Efectivo'}</p>
+              <table style="font-size: 0.85rem; margin-top: 5px;">
+                <thead>
+                  <tr><th>Código</th><th>Producto Vendido</th><th>Cantidad</th><th>Precio Unit.</th><th>Costo Unit.</th><th>Subtotal</th></tr>
+                </thead>
+                <tbody>
+                  ${v.items.map(i => `
+                    <tr>
+                      <td>${i.codigo}</td>
+                      <td>${i.producto}</td>
+                      <td><b>${i.cantidad}</b></td>                       <td>$${i.precio_unitario.toFixed(2)}</td>
+                      <td>$${i.costo_unitario.toFixed(2)}</td>                       <td>$${i.subtotal.toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        });
+      }
+
+      html += `<h3 style="color: #2c3e50; margin-top: 25px; margin-bottom: 10px;">3. Detalle Itemizado de Gastos Operativos</h3>`;
+
+      if (data.egresos.length === 0) {
+        html += `<p style="color:#777;">No hay egresos registrados en el periodo seleccionado.</p>`;
+      } else {
+        html += `
+          <table style="font-size: 0.85rem;">
+            <thead>
+              <tr><th>Fecha</th><th>Categoría</th><th>Concepto / Detalle</th><th>Método de Pago</th><th>Monto ($)</th></tr>
+            </thead>
+            <tbody>
+              ${data.egresos.map(e => `
+                <tr>
+                  <td>${new Date(e.fecha).toLocaleDateString()}</td>
+                  <td><b>${e.categoria}</b></td>
+                  <td>${e.concepto}</td>
+                  <td>${e.metodo_pago}</td>                   <td style="color:#e74c3c; font-weight:bold;">-$${e.monto.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      html += `</div>`;
+
+      document.getElementById('contenido-informe').innerHTML = html;
+      document.getElementById('modal-informe-detallado').style.display = 'flex';
     }
 
     // REPORTES Y HISTORIAL CAJA
