@@ -38,12 +38,12 @@
     .detalle-fin { background: #eef2f5; padding: 10px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 15px; font-family: monospace; }
     .egreso-cat { cursor: pointer; background: #ecf0f1; padding: 10px; font-weight: bold; border: 1px solid #bdc3c7; margin-top: 5px; }
     .egreso-det { display: none; padding-left: 20px; border-left: 3px solid #3498db; }
-    .filter-bar { display: flex; gap: 10px; background: #eef2f5; padding: 10px; border-radius: 6px; margin-bottom: 10px; align-items: flex-end; }
+    .filter-bar { display: flex; gap: 10px; background: #eef2f5; padding: 12px; border-radius: 6px; margin-bottom: 15px; align-items: flex-end; flex-wrap: wrap; }
   </style>
 </head>
 <body>
 
-  <!-- MODAL DE DIÁLOGOS PERSONALIZADOS (REEMPLAZO DE ALERT / CONFIRM / PROMPT) -->
+  <!-- MODAL DE DIÁLOGOS PERSONALIZADOS -->
   <div id="custom-modal-dialog" class="modal" style="z-index: 9999;">
     <div class="card" style="width: 420px; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.3);">
       <h3 id="custom-modal-title" style="margin-bottom: 12px; color: #2c3e50;">Aviso</h3>
@@ -127,21 +127,33 @@
     
     <div class="card">
       <h2>Historial de Ventas Directas</h2>
+      
+      <!-- BARRA DE FILTROS - VENTAS -->
       <div class="filter-bar">
-        <div>
-          <small><b>Filtrar por Categoría:</b></small>
-          <select id="hist-v-cat" onchange="cargarHistorialVentas()" style="padding:4px;">
+        <div style="flex:1; min-width:180px;">
+          <small><b>Buscar (Producto/Cliente/Código):</b></small><br>
+          <input type="text" id="hist-v-busqueda" oninput="renderHistorialVentas()" placeholder="Ej: 00001, Producto, Cliente..." style="padding:5px;">
+        </div>
+        <div style="width:160px;">
+          <small><b>Categoría:</b></small><br>
+          <select id="hist-v-cat" onchange="renderHistorialVentas()" style="padding:5px;">
             <option value="">Todas</option>
             <option value="Hogar">Hogar</option>
             <option value="Anime/Juguetes">Anime/Juguetes</option>
             <option value="Ropa">Ropa</option>
           </select>
         </div>
-        <div>
-          <small><b>Código de Pedido / ID Venta:</b></small>
-          <input type="text" id="hist-v-cod" oninput="cargarHistorialVentas()" placeholder="Ej: PED-101" style="padding:4px;">
+        <div style="width:140px;">
+          <small><b>Desde:</b></small><br>
+          <input type="date" id="hist-v-desde" onchange="renderHistorialVentas()" style="padding:4px;">
         </div>
-        <button class="btn btn-warning" onclick="limpiarFiltrosVentas()" style="padding:4px 8px; font-size:0.8rem;">Limpiar Filtros</button>
+        <div style="width:140px;">
+          <small><b>Hasta:</b></small><br>
+          <input type="date" id="hist-v-hasta" onchange="renderHistorialVentas()" style="padding:4px;">
+        </div>
+        <div>
+          <button class="btn btn-warning" onclick="limpiarFiltrosVentas()" style="padding:6px 12px; font-size:0.8rem; margin-bottom:0;">Limpiar Filtros</button>
+        </div>
       </div>
 
       <table>
@@ -156,7 +168,7 @@
       <h2 style="margin-bottom:15px; display:flex; justify-content:space-between;">Detalles de Venta <button onclick="document.getElementById('modal-venta').style.display='none'" class="btn btn-danger">X</button></h2>
       <div id="v-detalle-financiero" class="detalle-fin"></div>
       <div id="v-aviso-pedido" style="display:none; background:#f39c12; color:white; padding:10px; border-radius:5px; margin-bottom:15px; font-weight:bold;">
-        ⚠️ Esta venta proviene de un Pedido de Logística. Para modificar productos o procesar devoluciones debes ir a la sección "Pedidos Logística".
+        ⚠️️ Esta venta proviene de un Pedido de Logística. Para modificar productos o procesar devoluciones debes ir a la sección "Pedidos Logística".
       </div>
       
       <div id="v-acciones-modificacion">
@@ -406,6 +418,45 @@
     
     <div class="card">
       <h2>Logística de Pedidos Abiertos</h2>
+      
+      <!-- BARRA DE FILTROS - LOGÍSTICA / PEDIDOS -->
+      <div class="filter-bar">
+        <div style="flex:1; min-width:180px;">
+          <small><b>Buscar (Producto/Cliente/Código):</b></small><br>
+          <input type="text" id="ped-f-busqueda" oninput="renderTablaPedidos()" placeholder="Ej: Cliente, BEN-0123, Producto..." style="padding:5px;">
+        </div>
+        <div style="width:150px;">
+          <small><b>Categoría:</b></small><br>
+          <select id="ped-f-cat" onchange="renderTablaPedidos()" style="padding:5px;">
+            <option value="">Todas</option>
+            <option value="Hogar">Hogar</option>
+            <option value="Anime/Juguetes">Anime/Juguetes</option>
+            <option value="Ropa">Ropa</option>
+          </select>
+        </div>
+        <div style="width:170px;">
+          <small><b>Estado Envío:</b></small><br>
+          <select id="ped-f-estado" onchange="renderTablaPedidos()" style="padding:5px;">
+            <option value="">Todos los estados</option>
+            <option value="falta_saldar">Falta Saldar</option>
+            <option value="a_preparar">Saldado (A Preparar)</option>
+            <option value="listo_para_enviar">Paquete Listo</option>
+            <option value="enviado">Enviado Exitosamente</option>
+          </select>
+        </div>
+        <div style="width:130px;">
+          <small><b>Desde:</b></small><br>
+          <input type="date" id="ped-f-desde" onchange="renderTablaPedidos()" style="padding:4px;">
+        </div>
+        <div style="width:130px;">
+          <small><b>Hasta:</b></small><br>
+          <input type="date" id="ped-f-hasta" onchange="renderTablaPedidos()" style="padding:4px;">
+        </div>
+        <div>
+          <button class="btn btn-warning" onclick="limpiarFiltrosPedidos()" style="padding:6px 12px; font-size:0.8rem; margin-bottom:0;">Limpiar Filtros</button>
+        </div>
+      </div>
+
       <table>
         <thead><tr><th>Código / Cliente</th><th>Información Envio</th><th>Estado</th><th>Saldo a Pagar</th><th>Acciones de Logística</th></tr></thead>
         <tbody id="lista-pedidos"></tbody>
@@ -538,11 +589,12 @@
     let carritos = { venta: [], pedido: [] };
     let c1, c2, c3, pedidoA_Saldar = null, saldoA_Saldar = 0;
     let pedidoActivoModal = null, ventaActiva = null, productosMemoria = [];
+    let ventasMemoria = [], pedidosMemoria = [];
 
     document.getElementById('mes-filtro').value = new Date().toISOString().slice(0,7);
     setInterval(() => document.getElementById('hora-actual').innerText = new Date().toLocaleString(), 1000);
 
-    // SISTEMA ASÍNCRONO DE MODALES HTML PARA REEMPLAZAR DIÁLOGOS NATIVOS
+    // SISTEMA ASÍNCRONO DE MODALES HTML
     function customAlert(msg, title = "Aviso") {
       return new Promise((resolve) => {
         const modal = document.getElementById('custom-modal-dialog');
@@ -988,13 +1040,47 @@
       } 
     }
 
-    // HISTORIAL VENTAS DIRECTAS
+    // HISTORIAL VENTAS DIRECTAS CON FILTROS DINÁMICOS
     async function cargarHistorialVentas() {
-      const cat = document.getElementById('hist-v-cat') ? document.getElementById('hist-v-cat').value : '';
-      const cod = document.getElementById('hist-v-cod') ? document.getElementById('hist-v-cod').value : '';
+      const r = await fetch(`${API}/ventas`); 
+      ventasMemoria = await r.json();
+      renderHistorialVentas();
+    }
 
-      const r = await fetch(`${API}/ventas?categoria=${cat}&codigo_pedido=${cod}`); const v = await r.json();
-      document.getElementById('historial-ventas').innerHTML = v.map(x => `
+    function renderHistorialVentas() {
+      const busqueda = (document.getElementById('hist-v-busqueda')?.value || '').toLowerCase().trim();
+      const cat = document.getElementById('hist-v-cat')?.value || '';
+      const desde = document.getElementById('hist-v-desde')?.value || '';
+      const hasta = document.getElementById('hist-v-hasta')?.value || '';
+
+      const filtradas = ventasMemoria.filter(x => {
+        // 1. Filtro por Rango de Fechas
+        const fechaV = x.fecha ? x.fecha.split('T')[0] : '';
+        if (desde && fechaV < desde) return false;
+        if (hasta && fechaV > hasta) return false;
+
+        // 2. Filtro por Categoría
+        if (cat) {
+          const tieneCat = (x.categoria === cat) || (x.items && x.items.some(i => i.categoria === cat));
+          if (!tieneCat) return false;
+        }
+
+        // 3. Filtro por Búsqueda (ID Venta, Código Pedido, Nombre Cliente o Producto)
+        if (busqueda) {
+          const coincideId = String(x.id).toLowerCase().includes(busqueda);
+          const coincideCod = x.codigo_pedido && x.codigo_pedido.toLowerCase().includes(busqueda);
+          const coincideCliente = x.cliente_nombre && x.cliente_nombre.toLowerCase().includes(busqueda);
+          const coincideItem = x.items && x.items.some(i => 
+            (i.nombre && i.nombre.toLowerCase().includes(busqueda)) ||
+            (i.codigo_barras && i.codigo_barras.toLowerCase().includes(busqueda))
+          );
+          if (!coincideId && !coincideCod && !coincideCliente && !coincideItem) return false;
+        }
+
+        return true;
+      });
+
+      document.getElementById('historial-ventas').innerHTML = filtradas.map(x => `
         <tr>
           <td>#${x.id}</td>
           <td><b style="color:#2980b9;">${x.codigo_pedido ? x.codigo_pedido : '-'}</b></td>
@@ -1006,9 +1092,11 @@
     }
 
     function limpiarFiltrosVentas() {
-      document.getElementById('hist-v-cat').value = '';
-      document.getElementById('hist-v-cod').value = '';
-      cargarHistorialVentas();
+      if (document.getElementById('hist-v-busqueda')) document.getElementById('hist-v-busqueda').value = '';
+      if (document.getElementById('hist-v-cat')) document.getElementById('hist-v-cat').value = '';
+      if (document.getElementById('hist-v-desde')) document.getElementById('hist-v-desde').value = '';
+      if (document.getElementById('hist-v-hasta')) document.getElementById('hist-v-hasta').value = '';
+      renderHistorialVentas();
     }
 
     async function verVenta(id) {
@@ -1074,10 +1162,52 @@
       document.getElementById('modal-venta').style.display = 'none'; cargarHistorialVentas(); cargarInventario(); cargarDevoluciones(); cargarPedidos(); cargarReportes();
     }
     
-    // PEDIDOS LOGISTICA
+    // PEDIDOS LOGÍSTICA CON FILTROS DINÁMICOS
     async function cargarPedidos() {
-      const r = await fetch(`${API}/pedidos`); const p = await r.json();
-      document.getElementById('lista-pedidos').innerHTML = p.map(i => {
+      const r = await fetch(`${API}/pedidos`); 
+      pedidosMemoria = await r.json();
+      renderTablaPedidos();
+    }
+
+    function renderTablaPedidos() {
+      const busqueda = (document.getElementById('ped-f-busqueda')?.value || '').toLowerCase().trim();
+      const cat = document.getElementById('ped-f-cat')?.value || '';
+      const estado = document.getElementById('ped-f-estado')?.value || '';
+      const desde = document.getElementById('ped-f-desde')?.value || '';
+      const hasta = document.getElementById('ped-f-hasta')?.value || '';
+
+      const filtrados = pedidosMemoria.filter(i => {
+        // 1. Filtro por Rango de Fechas
+        const fechaP = i.fecha ? i.fecha.split('T')[0] : '';
+        if (desde && fechaP < desde) return false;
+        if (hasta && fechaP > hasta) return false;
+
+        // 2. Filtro por Estado de Envío
+        if (estado && i.estado !== estado) return false;
+
+        // 3. Filtro por Categoría
+        if (cat) {
+          const tieneCat = (i.categoria === cat) || (i.items && i.items.some(item => item.categoria === cat));
+          if (!tieneCat) return false;
+        }
+
+        // 4. Filtro por Búsqueda (Código Pedido, Cliente, DNI, Teléfono o Nombre de Producto)
+        if (busqueda) {
+          const coincideCod = i.codigo_pedido && i.codigo_pedido.toLowerCase().includes(busqueda);
+          const coincideCliente = i.cliente_nombre && i.cliente_nombre.toLowerCase().includes(busqueda);
+          const coincideDni = i.cliente_dni && String(i.cliente_dni).includes(busqueda);
+          const coincideTel = i.cliente_telefono && String(i.cliente_telefono).includes(busqueda);
+          const coincideItem = i.items && i.items.some(item => 
+            (item.nombre && item.nombre.toLowerCase().includes(busqueda)) ||
+            (item.codigo_barras && item.codigo_barras.toLowerCase().includes(busqueda))
+          );
+          if (!coincideCod && !coincideCliente && !coincideDni && !coincideTel && !coincideItem) return false;
+        }
+
+        return true;
+      });
+
+      document.getElementById('lista-pedidos').innerHTML = filtrados.map(i => {
         let badge = '', btns = `<button class="btn btn-primary" onclick="verDetallesPedido(${i.id})">Modificar Items / Cancelar / Detalles</button><br>`;
         if(i.estado === 'falta_saldar') { badge = '<span class="badge" style="background:#f39c12">Falta Saldar</span>'; btns += `<button class="btn btn-success" onclick="abrirSaldar(${i.id}, ${i.saldo_pendiente})">Registrar Pago Final</button>`; }
         else if(i.estado === 'a_preparar') { badge = '<span class="badge" style="background:#3498db">Saldado (A Preparar)</span>'; btns += `<button class="btn btn-warning" onclick="cambiarEstadoPed(${i.id}, 'listo_para_enviar')">Logística: Listo</button>`; }
@@ -1096,6 +1226,15 @@
 
         return `<tr><td>${codPedStr}<b>${i.cliente_nombre}</b><br><small>Tel: ${i.cliente_telefono||'-'}</small>${obsBadge}</td><td>${loc}</td><td>${badge}</td><td><b>$${i.saldo_pendiente.toFixed(2)}</b></td><td>${btns}</td></tr>`;
       }).join('');
+    }
+
+    function limpiarFiltrosPedidos() {
+      if (document.getElementById('ped-f-busqueda')) document.getElementById('ped-f-busqueda').value = '';
+      if (document.getElementById('ped-f-cat')) document.getElementById('ped-f-cat').value = '';
+      if (document.getElementById('ped-f-estado')) document.getElementById('ped-f-estado').value = '';
+      if (document.getElementById('ped-f-desde')) document.getElementById('ped-f-desde').value = '';
+      if (document.getElementById('ped-f-hasta')) document.getElementById('ped-f-hasta').value = '';
+      renderTablaPedidos();
     }
 
     async function verDetallesPedido(id) {
