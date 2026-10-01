@@ -1463,6 +1463,31 @@
       const ing = dias.map(dia => d.ev.filter(x=>x.d===dia).reduce((a,b)=>a+b.i,0)), gas = dias.map(dia => d.ev.filter(x=>x.d===dia).reduce((a,b)=>a+b.g,0));
       c3 = new Chart(document.getElementById('c-ev'), { type: 'line', data: { labels: dias, datasets: [{label:'Ingresos Operativos', data: ing, borderColor:'#27ae60'}, {label:'Egresos Reales', data: gas, borderColor:'#e74c3c'}] }});
     }
+
+    // ESCANEO AUTOMÁTICO CON ENTER PARA PISTOLA LECTORA
+['venta', 'pedido'].forEach(tipo => {
+  const input = document.getElementById(`buscar-${tipo}`);
+  if (!input) return;
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+
+      const r = await fetch(`${API}/productos/buscar?q=${q}`);
+      const data = await r.json();
+
+      if (data.length > 0) {
+        // Selecciona la coincidencia exacta del código o el primer resultado
+        const p = data.find(prod => prod.codigo_barras === q) || data[0];
+        agregarItem(tipo, p.id, p.nombre, p.precio, p.imagen || '', p.stock);
+        input.value = '';
+        document.getElementById(`sug-${tipo}`).style.display = 'none';
+      }
+    }
+  });
+});
   </script>
 </body>
 </html>
