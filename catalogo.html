@@ -17,6 +17,55 @@
       text-align: center;
     }
 
+    header h1 {
+      margin-bottom: 5px;
+    }
+
+    header p {
+      color: #bdc3c7;
+      margin-bottom: 15px;
+      font-size: 0.95rem;
+    }
+
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .social-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 0.9rem;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .social-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+
+    .btn-instagram {
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    }
+
+    .btn-tiktok {
+      background-color: #000000;
+      border: 1px solid #333;
+    }
+
+    .btn-whatsapp {
+      background-color: #25d366;
+    }
+
     .filter-bar {
       display: flex;
       gap: 15px;
@@ -115,6 +164,25 @@
     .badge-disponible { background-color: #e8f8f5; color: #27ae60; border: 1px solid #a3e4d7; }
     .badge-pocas { background-color: #fef9e7; color: #f39c12; border: 1px solid #f9e79f; }
     .badge-agotado { background-color: #fadbd8; color: #e74c3c; border: 1px solid #f5b7b1; }
+
+    .btn-wa-prod {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background-color: #25d366;
+      color: white;
+      text-decoration: none;
+      padding: 8px 0;
+      border-radius: 5px;
+      font-weight: bold;
+      font-size: 0.88rem;
+      margin-top: 5px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-wa-prod:hover {
+      background-color: #1ebc57;
+    }
   </style>
 </head>
 <body>
@@ -122,6 +190,18 @@
   <header>
     <h1>🌐 Catálogo BENEMEX</h1>
     <p>Consulta de Productos y Disponibilidad de Inventario en Tiempo Real</p>
+
+    <div class="social-links">
+      <a href="https://www.instagram.com/benemexstor?stkn=MWhucG5nZGxwYmdncQ==" target="_blank" class="social-btn btn-instagram">
+        📷 Instagram
+      </a>
+      <a href="https://www.tiktok.com/@benemexhome1?_r=1&_t=ZS-99vsEBMzuAZ" target="_blank" class="social-btn btn-tiktok">
+        🎵 TikTok
+      </a>
+      <a href="https://wa.me/message/WECQSM4KKEUSO1" target="_blank" class="social-btn btn-whatsapp">
+        💬 Chat de WhatsApp
+      </a>
+    </div>
   </header>
 
   <div class="filter-bar">
@@ -142,6 +222,7 @@
 
   <script>
     const API = 'https://benemex-pos.onrender.com/api';
+    const WHATSAPP_LINK = 'https://wa.me/message/WECQSM4KKEUSO1';
     let productosCatalogo = [];
 
     function parseImg(url) {
@@ -150,7 +231,7 @@
       return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
     }
 
-    // FUNCIÓN DE DISPONIBILIDAD CON CANTIDAD EXACTA
+    // OBTENER ESTADO Y CANTIDAD EXACTA
     function obtenerEstadoDisponibilidad(stock) {
       const cant = parseInt(stock) || 0;
 
@@ -213,6 +294,7 @@
               <h3 class="prod-title">${p.nombre}</h3>
               <div class="prod-price">$${parseFloat(p.precio).toFixed(2)}</div>
               <div>${badgeDisponibilidad}</div>
+              <a href="${WHATSAPP_LINK}" target="_blank" class="btn-wa-prod">📱 Pedir por WhatsApp</a>
             </div>
           </div>
         `;
