@@ -8,6 +8,35 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// INICIALIZACIÓN AUTOMÁTICA DE TABLAS Y COLUMNAS PARA COMISIONES
+async function initComisionesDatabase() {
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS comisionados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        porcentaje REAL NOT NULL,
+        datos TEXT
+      )
+    `);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS pagos_comisiones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        comisionado_id INTEGER NOT NULL,
+        monto REAL NOT NULL,
+        metodo_pago TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        fecha DATETIME DEFAULT (DATETIME('now', 'localtime'))
+      )
+    `);
+    try { await db.execute("ALTER TABLE ventas ADD COLUMN comisionado_id INTEGER"); } catch (e) {}
+    try { await db.execute("ALTER TABLE pedidos ADD COLUMN comisionado_id INTEGER"); } catch (e) {}
+  } catch (err) {
+    console.error("Error inicializando tablas de comisiones:", err);
+  }
+}
+initComisionesDatabase();
+
 // RUTAS PARA SERVIR LAS PÁGINAS HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -36,16 +65,16 @@ async function registrarVentaDesdePedido(pedidoId) {
   if (p.venta_id) {
     const totalPagado = (p.sena_efectivo||0) + (p.sena_tarjeta||0) + (p.sena_transferencia||0) + (p.sena_qr||0);
     await db.execute({
-      sql: 'UPDATE ventas SET subtotal = ?, descuento = ?, pago_efectivo = ?, pago_tarjeta = ?, pago_transferencia = ?, pago_qr = ?, total = ? WHERE id = ?',
-      args: [p.subtotal, p.descuento, p.sena_efectivo, p.sena_tarjeta, p.sena_transferencia, p.sena_qr, totalPagado, p.venta_id]
+      sql: 'UPDATE ventas SET subtotal = ?, descuento = ?, pago_efectivo = ?, pago_tarjeta = ?, pago_transferencia = ?, pago_qr = ?, total = ?, comisionado_id = ? WHERE id = ?',
+      args: [p.subtotal, p.descuento, p.sena_efectivo, p.sena_tarjeta, p.sena_transferencia, p.sena_qr, totalPagado, p.comisionado_id || null, p.venta_id]
     });
     return p.venta_id;
   }
 
   const totalFinal = (p.sena_efectivo||0) + (p.sena_tarjeta||0) + (p.sena_transferencia||0) + (p.sena_qr||0);
   const vRes = await db.execute({
-    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    args: [p.subtotal, p.descuento, p.sena_efectivo, p.sena_tarjeta, p.sena_transferencia, p.sena_qr, totalFinal, p.cliente_nombre]
+    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [p.subtotal, p.descuento, p.sena_efectivo, p.sena_tarjeta, p.sena_transferencia, p.sena_qr, totalFinal, p.cliente_nombre, p.comisionado_id || null]
   });
   const ventaId = Number(vRes.lastInsertRowid);
 
@@ -238,6 +267,62 @@ app.delete('/api/productos/:id', async (req, res) => {
   res.json({ mensaje: 'Borrado' });
 });
 
+// --- COMISIONES ---
+app.get('/api/comisionados', async (req, res) => {
+  const r = await db.execute('SELECT * FROM comisionados ORDER BY nombre ASC');
+  res.json(r.rows);
+});
+
+app.post('/api/comisionados', async (req, res) => {
+  const { nombre, porcentaje, datos } = req.body;
+  await db.execute({
+    sql: 'INSERT INTO comisionados (nombre, porcentaje, datos) VALUES (?, ?, ?)',
+    args: [nombre, porcentaje, datos || '']
+  });
+  res.json({ mensaje: 'Comisionado registrado' });
+});
+
+app.get('/api/comisiones/ventas', async (req, res) => {
+  const query = `
+    SELECT 
+      v.id as venta_id,
+      v.fecha,
+      v.comisionado_id,
+      c.nombre as comisionado_nombre,
+      c.porcentaje as porcentaje_aplicado,
+      p.codigo_pedido,
+      p.estado as estado_pedido,
+      prod.nombre as producto_nombre,
+      prod.codigo_barras,
+      dv.cantidad,
+      dv.precio_unitario as precio_venta,
+      dv.costo_unitario,
+      (dv.cantidad * dv.precio_unitario * (c.porcentaje / 100.0)) as monto_comision
+    FROM ventas v
+    JOIN comisionados c ON c.id = v.comisionado_id
+    JOIN detalle_ventas dv ON dv.venta_id = v.id
+    JOIN productos prod ON prod.id = dv.producto_id
+    LEFT JOIN pedidos p ON p.venta_id = v.id
+    ORDER BY v.fecha DESC
+  `;
+  const r = await db.execute(query);
+  res.json(r.rows);
+});
+
+app.get('/api/comisiones/pagos', async (req, res) => {
+  const r = await db.execute('SELECT * FROM pagos_comisiones ORDER BY fecha DESC');
+  res.json(r.rows);
+});
+
+app.post('/api/comisiones/pagos', async (req, res) => {
+  const { comisionado_id, monto, metodo_pago, tipo } = req.body;
+  await db.execute({
+    sql: 'INSERT INTO pagos_comisiones (comisionado_id, monto, metodo_pago, tipo) VALUES (?, ?, ?, ?)',
+    args: [comisionado_id, monto, metodo_pago, tipo]
+  });
+  res.json({ mensaje: 'Pago de comisión asentado' });
+});
+
 // --- VENTAS ---
 app.get('/api/ventas', async (req, res) => {
   const cat = req.query.categoria;
@@ -268,10 +353,10 @@ app.get('/api/ventas', async (req, res) => {
 });
 
 app.post('/api/ventas', async (req, res) => {
-  const { subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, items } = req.body;
+  const { subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, items, comisionado_id } = req.body;
   const vRes = await db.execute({
-    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    args: [subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre || 'Venta de Mostrador']
+    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre || 'Venta de Mostrador', comisionado_id || null]
   });
   const ventaId = Number(vRes.lastInsertRowid);
 
@@ -351,7 +436,7 @@ app.post('/api/ventas/:id/agregar-item', async (req, res) => {
   const existente = existRes.rows[0];
 
   if (existente) {
-    await db.execute({ sql: 'UPDATE detalle_ventas SET cantidad = cantidad + ? WHERE id = ?', args: [cantidad, existente.id] });
+    await db.execute({ sql: 'UPDATE detalle_ventas SET cantidad = cantidad + ? WHERE id = ?', args: [existente.id] });
   } else {
     const costRes = await db.execute({ sql: 'SELECT costo FROM productos WHERE id = ?', args: [producto_id] });
     const cost = costRes.rows[0]?.costo || 0;
@@ -458,14 +543,14 @@ app.get('/api/pedidos/:id/detalles', async (req, res) => {
 });
 
 app.post('/api/pedidos', async (req, res) => {
-  const { codigo_pedido, cliente, tel, dni, subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia, localidad, codigo_postal, tipo_direccion, direccion_domicilio, transporte, tracking, uber_pago, uber_costo, uber_metodo, items, sobre_stock } = req.body;
+  const { codigo_pedido, cliente, tel, dni, subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia, localidad, codigo_postal, tipo_direccion, direccion_domicilio, transporte, tracking, uber_pago, uber_costo, uber_metodo, items, sobre_stock, comisionado_id } = req.body;
   const estadoInicial = saldo_pendiente > 0 ? 'falta_saldar' : 'a_preparar';
   const obs = sobre_stock ? 'Falta cubrir Stock' : '';
   
   const pRes = await db.execute({
-    sql: `INSERT INTO pedidos (codigo_pedido, cliente_nombre, cliente_telefono, cliente_dni, subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia, localidad, codigo_postal, tipo_direccion, direccion_domicilio, transporte, tracking, estado, observacion) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [codigo_pedido||'', cliente, tel||'', dni||'', subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia||'', localidad||'', codigo_postal||'', tipo_direccion||'sucursal', direccion_domicilio||'', transporte||'', tracking||'', estadoInicial, obs]
+    sql: `INSERT INTO pedidos (codigo_pedido, cliente_nombre, cliente_telefono, cliente_dni, subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia, localidad, codigo_postal, tipo_direccion, direccion_domicilio, transporte, tracking, estado, observacion, comisionado_id) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [codigo_pedido||'', cliente, tel||'', dni||'', subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia||'', localidad||'', codigo_postal||'', tipo_direccion||'sucursal', direccion_domicilio||'', transporte||'', tracking||'', estadoInicial, obs, comisionado_id || null]
   });
   
   const pedId = Number(pRes.lastInsertRowid);
@@ -502,413 +587,4 @@ app.post('/api/pedidos/:id/saldar', async (req, res) => {
   const nuevaBaseSena = Math.max(0, p.subtotal - p.descuento);
 
   await db.execute({
-    sql: "UPDATE pedidos SET base_sena = ?, sena_efectivo = ?, sena_tarjeta = ?, sena_transferencia = ?, sena_qr = ?, saldo_pendiente = 0 WHERE id = ?",
-    args: [nuevaBaseSena, ef, ta, tr, qr, p.id]
-  });
-  
-  await registrarVentaDesdePedido(p.id);
-
-  const nuevoEstado = p.estado === 'enviado' ? 'enviado' : 'a_preparar';
-  await db.execute({ sql: "UPDATE pedidos SET estado = ? WHERE id = ?", args: [nuevoEstado, p.id] });
-
-  res.json({ mensaje: 'Saldado' });
-});
-
-app.put('/api/pedidos/:id/estado', async (req, res) => {
-  const { estado, tracking } = req.body;
-  if(tracking !== undefined) {
-    await db.execute({ sql: 'UPDATE pedidos SET estado = ?, tracking = ? WHERE id = ?', args: [estado, tracking, req.params.id] });
-  } else {
-    await db.execute({ sql: 'UPDATE pedidos SET estado = ? WHERE id = ?', args: [estado, req.params.id] });
-  }
-
-  if (estado === 'enviado' || estado === 'a_preparar' || estado === 'listo_para_enviar') {
-    await registrarVentaDesdePedido(req.params.id);
-  }
-
-  res.json({ mensaje: 'Estado Actualizado' });
-});
-
-app.get('/api/pedidos/:id/guia-viacargo', async (req, res) => {
-  const pRes = await db.execute({ sql: 'SELECT * FROM pedidos WHERE id = ?', args: [req.params.id] });
-  const p = pRes.rows[0];
-  if (!p) return res.status(404).send('Pedido no encontrado');
-
-  const itemsRes = await db.execute({ sql: 'SELECT dp.*, prod.nombre FROM detalle_pedidos dp JOIN productos prod ON prod.id = dp.producto_id WHERE dp.pedido_id = ?', args: [p.id] });
-  const direTxt = p.tipo_direccion === 'sucursal' ? 'Retiro en Sucursal Vía Cargo' : `Domicilio: ${p.direccion_domicilio || 'No especificada'}`;
-
-  const docHtml = `
-    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head><meta charset='utf-8'><title>Guía de Envío Vía Cargo</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-      .title { text-align: center; color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 5px; }
-      .box { border: 1px solid #cbd5e1; padding: 12px; margin-bottom: 15px; border-radius: 5px; background-color: #f8fafc; }
-      .box-header { background-color: #2563eb; color: white; padding: 6px 10px; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
-      th { background-color: #e2e8f0; }
-    </style>
-    </head>
-    <body>
-      <h2 class='title'>ETIQUETA DE ENVÍO - VÍA CARGO</h2>
-      <p style='text-align:right;'><b>Código de Pedido:</b> ${p.codigo_pedido || ('PED-' + p.id)} | <b>Fecha:</b> ${new Date(p.fecha).toLocaleDateString()}</p>
-      
-      <div class='box'>
-        <div class='box-header'>DATOS DEL REMITENTE (QUIEN ENVÍA)</div>
-        <p><b>Nombre:</b> RICARDO BENEGAS</p>
-        <p><b>DNI:</b> 256338166</p>
-        <p><b>Celular:</b> 1124889545</p>
-        <p><b>Origen:</b> Salta Capital, Salta, Argentina</p>
-      </div>
-
-      <div class='box'>
-        <div class='box-header'>DATOS DEL DESTINATARIO (QUIEN RECIBE)</div>
-        <p><b>Nombre y Apellido:</b> ${p.cliente_nombre}</p>
-        <p><b>DNI:</b> ${p.cliente_dni || 'No informado'}</p>
-        <p><b>Teléfono:</b> ${p.cliente_telefono || 'No informado'}</p>
-        <p><b>Provincia Destino:</b> ${p.provincia || 'No informada'}</p>
-        <p><b>Localidad / Ciudad:</b> ${p.localidad || 'No informada'}</p>
-        <p><b>Código Postal:</b> ${p.codigo_postal || 'No informado'}</p>
-        <p><b>Tipo de Entrega:</b> ${direTxt}</p>
-        <p><b>Empresa de Transporte:</b> ${p.transporte || 'Vía Cargo'}</p>
-      </div>
-
-      <div class='box'>
-        <div class='box-header'>CONTENIDO DEL PAQUETE</div>
-        <table>
-          <thead><tr><th>Producto</th><th>Cantidad</th></tr></thead>
-          <tbody>
-            ${itemsRes.rows.map(i => `<tr><td>${i.nombre}</td><td>${i.cantidad} u.</td></tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </body>
-    </html>
-  `;
-
-  res.setHeader('Content-Type', 'application/msword');
-  res.setHeader('Content-Disposition', `attachment; filename="Guia-ViaCargo-${p.codigo_pedido || p.id}.doc"`);
-  res.send(docHtml);
-});
-
-app.delete('/api/pedidos/:id', async (req, res) => {
-  const { metodo_reembolso } = req.body || {};
-  const pRes = await db.execute({ sql: 'SELECT * FROM pedidos WHERE id = ?', args: [req.params.id] });
-  const p = pRes.rows[0];
-  if (!p) return res.json({ mensaje: 'Pedido no encontrado' });
-  
-  if (p.venta_id) {
-     await db.execute({ sql: 'DELETE FROM detalle_ventas WHERE venta_id = ?', args: [p.venta_id] });
-     await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [p.venta_id] });
-  }
-
-  const detallesRes = await db.execute({ sql: 'SELECT dp.*, prod.nombre, prod.imagen FROM detalle_pedidos dp JOIN productos prod ON prod.id = dp.producto_id WHERE dp.pedido_id = ?', args: [p.id] });
-  for (const d of detallesRes.rows) {
-    await db.execute({ sql: 'UPDATE productos SET stock = stock + ? WHERE id = ?', args: [d.cantidad, d.producto_id] });
-  }
-
-  const totalSenaPagada = (p.sena_efectivo||0) + (p.sena_tarjeta||0) + (p.sena_transferencia||0) + (p.sena_qr||0);
-
-  if (p.estado === 'enviado') {
-    const origenD = `Pedido - ${p.cliente_nombre}`;
-    const metStr = formatMetodoReembolso(metodo_reembolso);
-    for (const d of detallesRes.rows) {
-      await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        args: [p.id, d.producto_id, d.nombre, d.imagen, d.cantidad, d.precio_unitario, d.cantidad * d.precio_unitario, origenD, metStr]
-      });
-    }
-  } else if (totalSenaPagada > 0) {
-    const origenD = `Pedido Cancelado - ${p.cliente_nombre}`;
-    const metStr = formatMetodoReembolso(metodo_reembolso);
-    await db.execute({
-      sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      args: [p.id, null, 'Pedido: Cancelado Totalmente', '', 1, totalSenaPagada, totalSenaPagada, origenD, metStr]
-    });
-  }
-
-  await db.execute({ sql: 'DELETE FROM pedidos WHERE id = ?', args: [p.id] });
-  res.json({ mensaje: 'Pedido cancelado' });
-});
-
-app.post('/api/pedidos/:id/modificar-cantidad', async (req, res) => {
-  const { detalle_id, nueva_cantidad, metodo_reembolso } = req.body;
-  const detRes = await db.execute({
-    sql: 'SELECT dp.*, p.nombre, p.imagen, ped.cliente_nombre, ped.venta_id, ped.estado, ped.sena_efectivo, ped.sena_tarjeta, ped.sena_transferencia, ped.sena_qr, ped.base_sena, ped.subtotal, ped.descuento FROM detalle_pedidos dp JOIN productos p ON p.id = dp.producto_id JOIN pedidos ped ON ped.id = dp.pedido_id WHERE dp.id = ?',
-    args: [detalle_id]
-  });
-  const det = detRes.rows[0];
-  if (!det || nueva_cantidad < 0) return res.json({ mensaje: 'Sin cambios' });
-
-  const diff = nueva_cantidad - det.cantidad;
-  if (diff > 0) {
-    await db.execute({ sql: 'UPDATE productos SET stock = stock - ? WHERE id = ?', args: [diff, det.producto_id] });
-    await revertirDevolucion(null, req.params.id, det.producto_id, diff);
-  } else if (diff < 0) {
-    const cantDev = Math.abs(diff);
-    await db.execute({ sql: 'UPDATE productos SET stock = stock + ? WHERE id = ?', args: [cantDev, det.producto_id] });
-    
-    if (det.estado === 'enviado') {
-      const devMonto = cantDev * det.precio_unitario;
-      const metStr = formatMetodoReembolso(metodo_reembolso);
-      await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        args: [req.params.id, det.producto_id, det.nombre, det.imagen, cantDev, det.precio_unitario, devMonto, `Pedido - ${det.cliente_nombre}`, metStr]
-      });
-    }
-  }
-
-  if (nueva_cantidad === 0) {
-    await db.execute({ sql: 'DELETE FROM detalle_pedidos WHERE id = ?', args: [det.id] });
-  } else {
-    await db.execute({ sql: 'UPDATE detalle_pedidos SET cantidad = ? WHERE id = ?', args: [nueva_cantidad, det.id] });
-  }
-
-  if (det.venta_id) {
-    const detVRes = await db.execute({ sql: 'SELECT id FROM detalle_ventas WHERE venta_id = ? AND producto_id = ?', args: [det.venta_id, det.producto_id] });
-    const detV = detVRes.rows[0];
-    if (detV) {
-      if (nueva_cantidad === 0) await db.execute({ sql: 'DELETE FROM detalle_ventas WHERE id = ?', args: [detV.id] });
-      else await db.execute({ sql: 'UPDATE detalle_ventas SET cantidad = ? WHERE id = ?', args: [nueva_cantidad, detV.id] });
-    }
-    const nuevosDetV = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [det.venta_id] })).rows;
-    if (nuevosDetV.length === 0) {
-      await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [det.venta_id] });
-    } else {
-      const nuevoSubV = nuevosDetV.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-      const vOriginal = (await db.execute({ sql: 'SELECT descuento FROM ventas WHERE id = ?', args: [det.venta_id] })).rows[0];
-      await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ? WHERE id = ?', args: [nuevoSubV, Math.max(0, nuevoSubV - vOriginal.descuento), det.venta_id] });
-    }
-  }
-
-  const nuevosDet = (await db.execute({ sql: 'SELECT * FROM detalle_pedidos WHERE pedido_id = ?', args: [req.params.id] })).rows;
-  if (nuevosDet.length === 0) {
-    const ped = (await db.execute({ sql: 'SELECT * FROM pedidos WHERE id = ?', args: [req.params.id] })).rows[0];
-    const totalSenaPagada = (ped.sena_efectivo||0) + (ped.sena_tarjeta||0) + (ped.sena_transferencia||0) + (ped.sena_qr||0);
-    if (totalSenaPagada > 0) {
-      const metStr = formatMetodoReembolso(metodo_reembolso);
-      await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        args: [req.params.id, null, 'Pedido Cancelado Totalmente', '', 1, totalSenaPagada, totalSenaPagada, `Pedido Cancelado - ${ped.cliente_nombre}`, metStr]
-      });
-    }
-    if (ped.venta_id) await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [ped.venta_id] });
-    await db.execute({ sql: 'DELETE FROM pedidos WHERE id = ?', args: [req.params.id] });
-  } else {
-    const nuevoSub = nuevosDet.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    const ped = (await db.execute({ sql: 'SELECT * FROM pedidos WHERE id = ?', args: [req.params.id] })).rows[0];
-    const totalPedidoNuevo = Math.max(0, nuevoSub - ped.descuento);
-
-    let baseSenaActual = ped.base_sena || 0;
-    let nuevoSaldo = totalPedidoNuevo - baseSenaActual;
-
-    if (ped.estado !== 'enviado' && nuevoSaldo < 0) {
-      const excedenteBase = Math.abs(nuevoSaldo);
-      const metStr = formatMetodoReembolso(metodo_reembolso);
-      await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        args: [req.params.id, null, 'Excedente de Seña Reintegrado', '', 1, excedenteBase, excedenteBase, `Pedido - ${ped.cliente_nombre}`, metStr]
-      });
-
-      let rRest = excedenteBase;
-      let ef = ped.sena_efectivo||0, tr = ped.sena_transferencia||0, ta = ped.sena_tarjeta||0, qr = ped.sena_qr||0;
-      if (metodo_reembolso === 'transferencia' || metodo_reembolso === '2') {
-        if (tr >= rRest) { tr -= rRest; rRest = 0; }
-        else { rRest -= tr; tr = 0; }
-      }
-      if (rRest > 0) {
-        if (ef >= rRest) { ef -= rRest; rRest = 0; }
-        else { rRest -= ef; ef = 0; }
-      }
-      if (rRest > 0 && tr > 0) {
-        if (tr >= rRest) { tr -= rRest; rRest = 0; }
-        else { rRest -= tr; tr = 0; }
-      }
-      if (rRest > 0 && ta > 0) {
-        if (ta >= rRest) { ta -= rRest; rRest = 0; }
-        else { rRest -= ta; ta = 0; }
-      }
-      if (rRest > 0 && qr > 0) {
-        if (qr >= rRest) { qr -= rRest; rRest = 0; }
-        else { rRest -= qr; qr = 0; }
-      }
-
-      baseSenaActual = totalPedidoNuevo;
-      await db.execute({
-        sql: 'UPDATE pedidos SET base_sena = ?, sena_efectivo = ?, sena_transferencia = ?, sena_tarjeta = ?, sena_qr = ? WHERE id = ?',
-        args: [baseSenaActual, ef, tr, ta, qr, req.params.id]
-      });
-      nuevoSaldo = 0;
-    }
-
-    let estadoConservado = ped.estado;
-    if (ped.estado !== 'enviado' && ped.estado !== 'listo_para_enviar') {
-      estadoConservado = nuevoSaldo > 0 ? 'falta_saldar' : 'a_preparar';
-    }
-    await db.execute({
-      sql: 'UPDATE pedidos SET subtotal = ?, base_sena = ?, saldo_pendiente = ?, estado = ? WHERE id = ?',
-      args: [nuevoSub, baseSenaActual, Math.max(0, nuevoSaldo), estadoConservado, req.params.id]
-    });
-  }
-
-  res.json({ mensaje: 'Cantidad de pedido modificada' });
-});
-
-app.post('/api/pedidos/:id/agregar-item', async (req, res) => {
-  const { producto_id, cantidad, precio } = req.body;
-  const pedRes = await db.execute({ sql: 'SELECT * FROM pedidos WHERE id = ?', args: [req.params.id] });
-  const ped = pedRes.rows[0];
-  if (!ped) return res.json({ mensaje: 'Pedido no encontrado' });
-
-  await db.execute({ sql: 'UPDATE productos SET stock = stock - ? WHERE id = ?', args: [cantidad, producto_id] });
-  await revertirDevolucion(null, req.params.id, producto_id, cantidad);
-
-  const existRes = await db.execute({ sql: 'SELECT * FROM detalle_pedidos WHERE pedido_id = ? AND producto_id = ?', args: [req.params.id, producto_id] });
-  const existente = existRes.rows[0];
-
-  if (existente) {
-    await db.execute({ sql: 'UPDATE detalle_pedidos SET cantidad = cantidad + ? WHERE id = ?', args: [cantidad, existente.id] });
-  } else {
-    await db.execute({ sql: 'INSERT INTO detalle_pedidos (pedido_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)', args: [req.params.id, producto_id, cantidad, precio] });
-  }
-
-  if (ped.venta_id) {
-    const existVRes = await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ? AND producto_id = ?', args: [ped.venta_id, producto_id] });
-    const existV = existVRes.rows[0];
-    if (existV) {
-      await db.execute({ sql: 'UPDATE detalle_ventas SET cantidad = cantidad + ? WHERE id = ?', args: [existV.id] });
-    } else {
-      const costRes = await db.execute({ sql: 'SELECT costo FROM productos WHERE id = ?', args: [producto_id] });
-      const cost = costRes.rows[0]?.costo || 0;
-      await db.execute({ sql: 'INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, costo_unitario) VALUES (?, ?, ?, ?, ?)', args: [ped.venta_id, producto_id, cantidad, precio, cost] });
-    }
-    const nuevosDetV = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [ped.venta_id] })).rows;
-    const nuevoSubV = nuevosDetV.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ? WHERE id = ?', args: [nuevoSubV, Math.max(0, nuevoSubV - ped.descuento), ped.venta_id] });
-  }
-
-  const nuevosDet = (await db.execute({ sql: 'SELECT * FROM detalle_pedidos WHERE pedido_id = ?', args: [req.params.id] })).rows;
-  const nuevoSub = nuevosDet.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-  const baseSenaActual = ped.base_sena || 0;
-  const nuevoSaldo = nuevoSub - ped.descuento - baseSenaActual;
-  
-  let estadoConservado = ped.estado;
-  if (ped.estado !== 'enviado' && ped.estado !== 'listo_para_enviar') {
-    estadoConservado = nuevoSaldo > 0 ? 'falta_saldar' : 'a_preparar';
-  }
-  await db.execute({ sql: 'UPDATE pedidos SET subtotal = ?, saldo_pendiente = ?, estado = ? WHERE id = ?', args: [nuevoSub, Math.max(0, nuevoSaldo), estadoConservado, req.params.id] });
-
-  res.json({ mensaje: 'Item agregado a pedido' });
-});
-
-// --- REPORTES ---
-app.get('/api/reportes/dashboard', async (req, res) => {
-  const mes = req.query.mes || new Date().toISOString().slice(0,7);
-  
-  const v = (await db.execute({ sql: "SELECT SUM(total) as t FROM ventas WHERE strftime('%Y-%m', fecha) = ?", args: [mes] })).rows[0]?.t || 0;
-  const c = (await db.execute({ sql: "SELECT SUM(dv.cantidad * dv.costo_unitario) as c FROM detalle_ventas dv JOIN ventas v ON v.id = dv.venta_id WHERE strftime('%Y-%m', v.fecha) = ?", args: [mes] })).rows[0]?.c || 0;
-  const g = (await db.execute({ sql: "SELECT SUM(monto) as m FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto'", args: [mes] })).rows[0]?.m || 0;
-  
-  const prods = (await db.execute({ sql: "SELECT p.nombre, SUM(dv.cantidad) as cant FROM detalle_ventas dv JOIN ventas v ON v.id=dv.venta_id JOIN productos p ON p.id=dv.producto_id WHERE strftime('%Y-%m', v.fecha) = ? GROUP BY p.id ORDER BY cant DESC LIMIT 10", args: [mes] })).rows;
-  const gas = (await db.execute({ sql: "SELECT categoria, SUM(monto) as m FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto' GROUP BY categoria ORDER BY m DESC LIMIT 10", args: [mes] })).rows;
-  const ev = (await db.execute({ sql: `SELECT strftime('%d', fecha) as d, SUM(total) as i, 0 as g FROM ventas WHERE strftime('%Y-%m', fecha) = ? GROUP BY d UNION ALL SELECT strftime('%d', fecha) as d, 0 as i, SUM(monto) as g FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto' GROUP BY d`, args: [mes, mes] })).rows;
-
-  res.json({ pl: { ventas: v, cogs: c, gastos: g, neta: v - c - g }, prods, gas, ev });
-});
-
-// ENDPOINT PARA INFORME FINANCIERO DETALLADO OPERATIVO
-app.get('/api/reportes/detallado', async (req, res) => {
-  const { desde, hasta, mes } = req.query;
-  let condVentas = "";
-  let condEgresos = "";
-  let paramsV = [];
-  let paramsE = [];
-
-  if (mes) {
-    condVentas = "WHERE strftime('%Y-%m', v.fecha) = ?";
-    condEgresos = "WHERE strftime('%Y-%m', fecha) = ?";
-    paramsV.push(mes);
-    paramsE.push(mes);
-  } else if (desde && hasta) {
-    condVentas = "WHERE DATE(v.fecha) >= ? AND DATE(v.fecha) <= ?";
-    condEgresos = "WHERE DATE(fecha) >= ? AND DATE(fecha) <= ?";
-    paramsV.push(desde, hasta);
-    paramsE.push(desde, hasta);
-  } else {
-    const mesActual = new Date().toISOString().slice(0, 7);
-    condVentas = "WHERE strftime('%Y-%m', v.fecha) = ?";
-    condEgresos = "WHERE strftime('%Y-%m', fecha) = ?";
-    paramsV.push(mesActual);
-    paramsE.push(mesActual);
-  }
-
-  const qVentas = `
-    SELECT v.id as venta_id, v.fecha, v.cliente_nombre, v.subtotal, v.descuento, v.total,
-           v.pago_efectivo, v.pago_tarjeta, v.pago_transferencia, v.pago_qr,
-           dv.cantidad, dv.precio_unitario, dv.costo_unitario,
-           p.nombre as producto_nombre, p.codigo_barras
-    FROM ventas v
-    JOIN detalle_ventas dv ON dv.venta_id = v.id
-    JOIN productos p ON p.id = dv.producto_id
-    ${condVentas}
-    ORDER BY v.fecha DESC
-  `;
-  const ventasRes = await db.execute({ sql: qVentas, args: paramsV });
-
-  const qEgresos = `
-    SELECT * FROM egresos
-    ${condEgresos ? condEgresos + " AND tipo = 'gasto'" : "WHERE tipo = 'gasto'"}
-    ORDER BY fecha DESC
-  `;
-  const egresosRes = await db.execute({ sql: qEgresos, args: paramsE });
-
-  let totalVentas = 0;
-  let totalCostos = 0;
-  const mapaVentas = new Map();
-
-  ventasRes.rows.forEach(r => {
-    if (!mapaVentas.has(r.venta_id)) {
-      mapaVentas.set(r.venta_id, {
-        id: r.venta_id,
-        fecha: r.fecha,
-        cliente: r.cliente_nombre,
-        subtotal: r.subtotal,
-        descuento: r.descuento,
-        total: r.total,
-        pago_efectivo: r.pago_efectivo || 0,
-        pago_tarjeta: r.pago_tarjeta || 0,
-        pago_transferencia: r.pago_transferencia || 0,
-        pago_qr: r.pago_qr || 0,
-        items: []
-      });
-      totalVentas += r.total;
-    }
-
-    totalCostos += (r.cantidad * r.costo_unitario);
-    mapaVentas.get(r.venta_id).items.push({
-      producto: r.producto_nombre,
-      codigo: r.codigo_barras,
-      cantidad: r.cantidad,
-      precio_unitario: r.precio_unitario,
-      costo_unitario: r.costo_unitario,
-      subtotal: r.cantidad * r.precio_unitario
-    });
-  });
-
-  const totalEgresos = egresosRes.rows.reduce((acc, e) => acc + e.monto, 0);
-  const resultadoOperativo = totalVentas - totalCostos - totalEgresos;
-
-  res.json({
-    resumen: {
-      totalVentas,
-      totalCostos,
-      totalEgresos,
-      resultadoOperativo
-    },
-    ventas: Array.from(mapaVentas.values()),
-    egresos: egresosRes.rows
-  });
-});
-
-app.listen(process.env.PORT || 3000, () => console.log('Servidor listo'));
+    sql: "UPDATE pedidos SET base_sena = ?, sena_efectivo = ?, sena_tarjeta = ?, sena_transferencia
