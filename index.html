@@ -98,6 +98,7 @@
     <button class="tab-btn" onclick="mostrarPestana('tab-gastos', this); cargarEgresos();">💸 Egresos</button>
     <button class="tab-btn" onclick="mostrarPestana('tab-pedidos', this); cargarPedidos();">📦 Pedidos Logística</button>
     <button class="tab-btn" onclick="mostrarPestana('tab-devoluciones', this); cargarDevoluciones();">🔄 Devoluciones</button>
+    <button class="tab-btn" onclick="accederComisiones(this)">💼 Comisiones</button>
     <button class="tab-btn" onclick="mostrarPestana('tab-cierre', this); cargarReportes();">📊 Cierre de Caja</button>
     <a href="https://benemex-pos.onrender.com/catalogo.html" target="_blank" class="tab-btn" style="text-decoration:none; color:#2980b9;">🌐 Catálogo Público ↗</a>
   </div>
@@ -114,10 +115,20 @@
         <thead><tr><th>Foto</th><th>Producto</th><th>Cant.</th><th>Precio U. (Editable)</th><th>Subtotal</th><th>Acción</th></tr></thead>
         <tbody id="tabla-venta"></tbody>
       </table>
-      <div style="margin-top: 15px; display:flex; justify-content:space-between; align-items:center;">
-        <h3>Pagos Múltiples y Descuentos</h3>
-        <div style="width:200px;"><label>Desc. Global (%):</label><input type="number" id="v-desc" value="0" oninput="calcV()"></div>
+      
+      <div style="margin-top: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="flex:1; min-width:220px;">
+          <label><b>👤 Vendedor / Comisionado:</b></label>
+          <select id="v-comisionado">
+            <option value="">Venta del Local (Sin comisión)</option>
+          </select>
+        </div>
+        <div style="width:200px;">
+          <label>Desc. Global (%):</label>
+          <input type="number" id="v-desc" value="0" oninput="calcV()">
+        </div>
       </div>
+
       <div class="split-grid">
         <div><b>Método</b></div><div><b>Monto Base a Cubrir ($)</b></div><div><b>Recargo Adicional (%)</b></div>
         <div>💵 Efectivo</div><div><input type="number" id="v-m-ef" value="0" oninput="calcV()"></div><div><i>(Sin recargo)</i></div>
@@ -135,7 +146,6 @@
     <div class="card">
       <h2>Historial de Ventas Directas</h2>
       
-      <!-- BARRA DE FILTROS - VENTAS -->
       <div class="filter-bar">
         <div style="flex:1; min-width:180px;">
           <small><b>Buscar (Producto/Cliente/Código):</b></small><br>
@@ -361,11 +371,15 @@
         <input type="text" id="ped-dni" placeholder="DNI Cliente" style="flex:1;">
       </div>
       
-      <div style="display:flex; gap:10px; margin-bottom:10px;">
-        <select id="p-tipo-entrega" style="flex:1;" onchange="toggleEnvio()">
+      <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+        <select id="p-tipo-entrega" style="flex:1; min-width:200px;" onchange="toggleEnvio()">
           <option value="local">Tienda: Retiro en Local</option>
           <option value="salta">Moto: Envío en Salta</option>
           <option value="provincia">Paquete: Envío a Otra Provincia</option>
+        </select>
+        
+        <select id="p-comisionado" style="flex:1; min-width:200px;">
+          <option value="">Venta del Local (Sin comisión)</option>
         </select>
       </div>
 
@@ -426,7 +440,6 @@
     <div class="card">
       <h2>Logística de Pedidos Abiertos</h2>
       
-      <!-- BARRA DE FILTROS - LOGÍSTICA / PEDIDOS -->
       <div class="filter-bar">
         <div style="flex:1; min-width:180px;">
           <small><b>Buscar (Producto/Cliente/Código):</b></small><br>
@@ -531,6 +544,55 @@
     </div>
   </div>
 
+  <!-- PESTAÑA COMISIONES -->
+  <div id="tab-comisiones" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h2>👤 Registrar Nuevo Comisionado</h2>
+        <form id="form-comisionado" onsubmit="guardarComisionado(event)">
+          <div class="form-group">
+            <label>Nombre Completo:</label>
+            <input type="text" id="com-nombre" required placeholder="Ej: Lucas González">
+          </div>
+          <div class="form-group">
+            <label>Porcentaje de Comisión (%):</label>
+            <input type="number" step="0.1" id="com-porcentaje" required placeholder="Ej: 10">
+          </div>
+          <div class="form-group">
+            <label>Teléfono / DNI (Opcional):</label>
+            <input type="text" id="com-datos" placeholder="Ej: 3871234567">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Guardar Comisionado</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>🔍 Filtros de Búsqueda de Comisiones</h2>
+        <div class="filter-bar">
+          <div style="flex:1; min-width:140px;">
+            <small><b>Comisionado:</b></small>
+            <select id="f-com-comisionado" onchange="renderComisiones()" style="padding:4px;"></select>
+          </div>
+          <div style="flex:1; min-width:140px;">
+            <small><b>Buscar (Producto/Código):</b></small>
+            <input type="text" id="f-com-busqueda" oninput="renderComisiones()" placeholder="Ej: Remera, BEN-01..." style="padding:4px;">
+          </div>
+          <div style="width:130px;">
+            <small><b>Desde:</b></small>
+            <input type="date" id="f-com-desde" onchange="renderComisiones()" style="padding:3px;">
+          </div>
+          <div style="width:130px;">
+            <small><b>Hasta:</b></small>
+            <input type="date" id="f-com-hasta" onchange="renderComisiones()" style="padding:3px;">
+          </div>
+          <button class="btn btn-warning" onclick="limpiarFiltrosComisiones()" style="padding:4px 8px; font-size:0.8rem; margin-bottom:0;">Limpiar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="contenedor-carpetas-comisionados"></div>
+  </div>
+
   <!-- PESTAÑA CIERRE Y REPORTES -->
   <div id="tab-cierre" class="tab-content">
     
@@ -621,7 +683,6 @@
         </div>
       </div>
 
-      <!-- CONTENIDO DEL INFORME -->
       <div id="contenido-informe"></div>
     </div>
   </div>
@@ -632,6 +693,12 @@
     let c1, c2, c3, pedidoA_Saldar = null, saldoA_Saldar = 0;
     let pedidoActivoModal = null, ventaActiva = null, productosMemoria = [];
     let ventasMemoria = [], pedidosMemoria = [];
+
+    // MÓDULO COMISIONES
+    let comisionesDesbloqueadas = false;
+    let comisionadosMemoria = [];
+    let ventasComisionesMemoria = [];
+    let pagosComisionesMemoria = [];
 
     document.getElementById('mes-filtro').value = new Date().toISOString().slice(0,7);
     setInterval(() => document.getElementById('hora-actual').innerText = new Date().toLocaleString(), 1000);
@@ -883,8 +950,31 @@
       if (Math.abs(l.falta) > 0.01) return await customAlert('El monto debe cubrirse exacto.');
       const resName = await customPrompt('Nombre del cliente para el registro (Dejar vacío si es mostrador general):');
       const cNom = resName || 'Venta de Mostrador';
-      await fetch(`${API}/ventas`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cliente_nombre: cNom, items: carritos.venta.map(i => ({producto_id: i.id, cantidad: i.cant, precio: i.precio})), subtotal: carritos.venta.reduce((a,i)=>a+(i.precio*i.cant),0), descuento: l.descMonto, pago_efectivo: l.tEf, pago_tarjeta: l.tTa, pago_transferencia: l.tTr, pago_qr: l.tQr, total: l.total})});
-      carritos.venta = []; renderCarrito('venta'); resetCamposSplit('v'); cargarHistorialVentas(); cargarReportes(); 
+      const comId = document.getElementById('v-comisionado').value || null;
+
+      await fetch(`${API}/ventas`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          cliente_nombre: cNom,
+          comisionado_id: comId,
+          items: carritos.venta.map(i => ({producto_id: i.id, cantidad: i.cant, precio: i.precio})),
+          subtotal: carritos.venta.reduce((a,i)=>a+(i.precio*i.cant),0),
+          descuento: l.descMonto,
+          pago_efectivo: l.tEf,
+          pago_tarjeta: l.tTa,
+          pago_transferencia: l.tTr,
+          pago_qr: l.tQr,
+          total: l.total
+        })
+      });
+
+      carritos.venta = [];
+      renderCarrito('venta');
+      resetCamposSplit('v');
+      document.getElementById('v-comisionado').value = '';
+      cargarHistorialVentas();
+      cargarReportes(); 
       await customAlert('¡Venta cerrada con éxito!');
     }
 
@@ -906,12 +996,14 @@
     async function cobrarPedido() {
       if(carritos.pedido.length === 0) return await customAlert('No hay productos cargados en el pedido.'); const l = calcP();
       const sobreStock = carritos.pedido.some(i => i.cant > i.stockActual);
+      const comId = document.getElementById('p-comisionado').value || null;
       
       const p = { 
         codigo_pedido: document.getElementById('ped-codigo').value,
         cliente: document.getElementById('ped-cliente').value,
         tel: document.getElementById('ped-telefono').value,
         dni: document.getElementById('ped-dni').value,
+        comisionado_id: comId,
         subtotal: carritos.pedido.reduce((a,i)=>a+(i.precio*i.cant),0), descuento: l.descMonto,
         base_sena: (parseFloat(document.getElementById('p-m-ef').value)||0) + (parseFloat(document.getElementById('p-m-ta').value)||0) + (parseFloat(document.getElementById('p-m-tr').value)||0) + (parseFloat(document.getElementById('p-m-qr').value)||0),
         sena_efectivo: l.tEf, sena_tarjeta: l.tTa, sena_transferencia: l.tTr, sena_qr: l.tQr, saldo_pendiente: l.falta, 
@@ -929,7 +1021,9 @@
       await fetch(`${API}/pedidos`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
       carritos.pedido = []; renderCarrito('pedido');
       ['ped-codigo','ped-cliente','ped-telefono','ped-dni','p-provincia','p-localidad','p-cp','p-direccion-domicilio'].forEach(id => document.getElementById(id).value = '');
-      document.getElementById('p-tipo-entrega').value = 'local'; toggleEnvio(); resetCamposSplit('p'); cargarPedidos(); cargarHistorialVentas(); cargarReportes(); 
+      document.getElementById('p-tipo-entrega').value = 'local';
+      document.getElementById('p-comisionado').value = '';
+      toggleEnvio(); resetCamposSplit('p'); cargarPedidos(); cargarHistorialVentas(); cargarReportes(); 
       await customAlert('Pedido guardado exitosamente.');
     }
 
@@ -1254,7 +1348,7 @@
         let obsBadge = i.observacion ? `<br><span class="badge" style="background:#e74c3c;">${i.observacion}</span>` : '';
         let loc = '';
         if(i.tipo_entrega === 'provincia') loc = `<br><small>📦 Prov: ${i.provincia||'-'} | Loc: ${i.localidad||'-'} (CP: ${i.codigo_postal||'-'}) | DNI: ${i.cliente_dni||'-'}</small>`;
-        else if (i.tipo_entrega === 'salta') loc = `<br><small>🏍️ Moto (Salta)</small>`;
+        else if (i.tipo_entrega === 'salta') loc = `<br><small>🏍️️ Moto (Salta)</small>`;
         else loc = `<br><small>🏪 Retiro Local</small>`;
 
         const codPedStr = i.codigo_pedido ? `<b style="color:#2980b9;">[${i.codigo_pedido}]</b> ` : '';
@@ -1339,6 +1433,290 @@
         </tr>`).join('');
     }
 
+    // LÓGICA MÓDULO COMISIONES
+    async function accederComisiones(btn) {
+      if (!comisionesDesbloqueadas) {
+        const pass = await customPrompt("Ingrese la contraseña de acceso a Comisiones:", "", "Acceso Restringido");
+        if (pass === "ricardobenemex108") {
+          comisionesDesbloqueadas = true;
+          await customAlert("Acceso concedido", "Éxito");
+        } else {
+          if (pass !== null) await customAlert("Contraseña incorrecta", "Acceso Denegado");
+          return;
+        }
+      }
+      mostrarPestana('tab-comisiones', btn);
+      cargarComisiones();
+    }
+
+    async function cargarComisionadosSelects() {
+      try {
+        const r = await fetch(`${API}/comisionados`);
+        comisionadosMemoria = await r.json();
+
+        const optDefault = '<option value="">Venta del Local (Sin comisión)</option>';
+        const opts = comisionadosMemoria.map(c => `<option value="${c.id}">${c.nombre} (${c.porcentaje}%)</option>`).join('');
+
+        if (document.getElementById('v-comisionado')) document.getElementById('v-comisionado').innerHTML = optDefault + opts;
+        if (document.getElementById('p-comisionado')) document.getElementById('p-comisionado').innerHTML = optDefault + opts;
+        
+        if (document.getElementById('f-com-comisionado')) {
+          document.getElementById('f-com-comisionado').innerHTML = '<option value="">Todos los comisionados</option>' + 
+            comisionadosMemoria.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        }
+      } catch (e) {
+        console.error("Error al cargar comisionados:", e);
+      }
+    }
+
+    async function guardarComisionado(e) {
+      e.preventDefault();
+      const nombre = document.getElementById('com-nombre').value;
+      const porcentaje = parseFloat(document.getElementById('com-porcentaje').value);
+      const datos = document.getElementById('com-datos').value;
+
+      await fetch(`${API}/comisionados`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, porcentaje, datos })
+      });
+
+      document.getElementById('form-comisionado').reset();
+      await customAlert("Comisionado registrado exitosamente.");
+      await cargarComisionadosSelects();
+      cargarComisiones();
+    }
+
+    async function cargarComisiones() {
+      await cargarComisionadosSelects();
+      
+      const rV = await fetch(`${API}/comisiones/ventas`);
+      ventasComisionesMemoria = await rV.json();
+
+      const rP = await fetch(`${API}/comisiones/pagos`);
+      pagosComisionesMemoria = await rP.json();
+
+      renderComisiones();
+    }
+
+    function limpiarFiltrosComisiones() {
+      if(document.getElementById('f-com-comisionado')) document.getElementById('f-com-comisionado').value = '';
+      if(document.getElementById('f-com-busqueda')) document.getElementById('f-com-busqueda').value = '';
+      if(document.getElementById('f-com-desde')) document.getElementById('f-com-desde').value = '';
+      if(document.getElementById('f-com-hasta')) document.getElementById('f-com-hasta').value = '';
+      renderComisiones();
+    }
+
+    function renderComisiones() {
+      const contenedor = document.getElementById('contenedor-carpetas-comisionados');
+      if (!contenedor) return;
+      contenedor.innerHTML = '';
+
+      const comSel = document.getElementById('f-com-comisionado')?.value;
+      const busqueda = (document.getElementById('f-com-busqueda')?.value || '').toLowerCase().trim();
+      const desde = document.getElementById('f-com-desde')?.value;
+      const hasta = document.getElementById('f-com-hasta')?.value;
+
+      let comisionadosFiltrados = comisionadosMemoria;
+      if (comSel) {
+        comisionadosFiltrados = comisionadosFiltrados.filter(c => String(c.id) === String(comSel));
+      }
+
+      if (comisionadosFiltrados.length === 0) {
+        contenedor.innerHTML = '<div class="card"><p style="text-align:center;">No hay comisionados registrados o coincidentes.</p></div>';
+        return;
+      }
+
+      comisionadosFiltrados.forEach(c => {
+        let ventasC = ventasComisionesMemoria.filter(v => String(v.comisionado_id) === String(c.id));
+
+        ventasC = ventasC.filter(v => {
+          const fechaV = v.fecha ? v.fecha.split('T')[0] : '';
+          if (desde && fechaV < desde) return false;
+          if (hasta && fechaV > hasta) return false;
+
+          if (busqueda) {
+            const coincCod = v.codigo_pedido && v.codigo_pedido.toLowerCase().includes(busqueda);
+            const coincProd = v.producto_nombre && v.producto_nombre.toLowerCase().includes(busqueda);
+            if (!coincCod && !coincProd) return false;
+          }
+          return true;
+        });
+
+        const totalComisionesGeneradas = ventasC.reduce((acc, v) => acc + parseFloat(v.monto_comision || 0), 0);
+
+        const pagosC = pagosComisionesMemoria.filter(p => String(p.comisionado_id) === String(c.id));
+        const totalPagado = pagosC.reduce((acc, p) => acc + parseFloat(p.monto || 0), 0);
+
+        const saldoDeuda = totalComisionesGeneradas - totalPagado;
+
+        const carpeta = document.createElement('div');
+        carpeta.className = 'card';
+        carpeta.style.borderLeft = '6px solid #2980b9';
+
+        let estadoDeudaHTML = '';
+        if (saldoDeuda > 0) {
+          estadoDeudaHTML = `<span style="color:#e74c3c; font-weight:bold;">🔴 Comisiones A Pagar (Deuda): $${saldoDeuda.toFixed(2)}</span>`;
+        } else if (saldoDeuda < 0) {
+          estadoDeudaHTML = `<span style="color:#27ae60; font-weight:bold;">🟢 Saldo a Favor / Adelanto Cubierto: $${Math.abs(saldoDeuda).toFixed(2)}</span>`;
+        } else {
+          estadoDeudaHTML = `<span style="color:#2980b9; font-weight:bold;">✅ Al Día (Sin deudas)</span>`;
+        }
+
+        carpeta.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+            <div>
+              <h2 style="margin:0; color:#2c3e50;">📁 Carpeta: ${c.nombre}</h2>
+              <small>Comisión asignada: <b>${c.porcentaje}%</b> ${c.datos ? '| ' + c.datos : ''}</small>
+            </div>
+            <div style="font-size:1.1rem;">
+              ${estadoDeudaHTML}
+            </div>
+          </div>
+
+          <div style="background:#eef2f5; padding:12px; border-radius:6px; margin-bottom:15px; border:1px solid #bdc3c7;">
+            <h4 style="margin-bottom:8px; color:#2c3e50;">💸 Registrar Pago o Adelanto de Comisión:</h4>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <input type="number" id="pago-monto-${c.id}" placeholder="Monto ($)" style="width:130px; padding:6px;">
+              
+              <select id="pago-metodo-${c.id}" style="width:160px; padding:6px;">
+                <option value="efectivo">💵 Efectivo</option>
+                <option value="transferencia">🏦 Transferencia</option>
+              </select>
+
+              <select id="pago-tipo-${c.id}" style="width:190px; padding:6px;">
+                <option value="pago">Pago de Comisiones</option>
+                <option value="adelanto">Adelanto de Comisiones</option>
+              </select>
+
+              <button class="btn btn-success" onclick="registrarPagoComision(${c.id}, '${c.nombre}', ${saldoDeuda})" style="margin-bottom:0;">Registrar y Liquidar</button>
+            </div>
+          </div>
+
+          <h3>📋 Historial de Movimientos y Ventas</h3>
+          <table style="font-size:0.85rem; margin-top:8px;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th>Fecha</th>
+                <th>Código / Pedido</th>
+                <th>Producto</th>
+                <th>Costo U.</th>
+                <th>Precio Venta</th>
+                <th>% Com.</th>
+                <th>Comisión Generada</th>
+                <th>Pago / Adelanto</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${generarFilasHistorialComisionado(ventasC, pagosC)}
+            </tbody>
+          </table>
+          
+          <div style="text-align:right; margin-top:10px; font-size:1rem; background:#f8fafc; padding:8px; border-radius:4px;">
+            <b>Total Generado:</b> $${totalComisionesGeneradas.toFixed(2)} | 
+            <b>Total Abonado:</b> $${totalPagado.toFixed(2)} | 
+            <b>Saldo a Pagar Neto:</b> <span style="color:${saldoDeuda > 0 ? '#e74c3c' : '#27ae60'}">$${saldoDeuda.toFixed(2)}</span>
+          </div>
+        `;
+
+        contenedor.appendChild(carpeta);
+      });
+    }
+
+    function generarFilasHistorialComisionado(ventas, pagos) {
+      let items = [];
+
+      ventas.forEach(v => {
+        items.push({
+          fecha: new Date(v.fecha),
+          codigo: v.codigo_pedido ? `<b>[${v.codigo_pedido}]</b>` : `Venta #${v.venta_id}`,
+          producto: v.producto_nombre,
+          costo: `$${parseFloat(v.costo_unitario||0).toFixed(2)}`,
+          precio: `$${parseFloat(v.precio_venta||0).toFixed(2)}`,
+          porcentaje: `${v.porcentaje_aplicado}%`,
+          comision: `<b style="color:#27ae60;">+$${parseFloat(v.monto_comision).toFixed(2)}</b>`,
+          pago: '-'
+        });
+      });
+
+      pagos.forEach(p => {
+        const badgeTipo = p.tipo === 'adelanto' ? '<span class="badge" style="background:#f39c12">Adelanto</span>' : '<span class="badge" style="background:#27ae60">Pago</span>';
+        items.push({
+          fecha: new Date(p.fecha),
+          codigo: `${badgeTipo} (${p.metodo_pago})`,
+          producto: `<i>${p.tipo === 'adelanto' ? 'Adelanto de comisión' : 'Abono de comisión a deuda'}</i>`,
+          costo: '-',
+          precio: '-',
+          porcentaje: '-',
+          comision: '-',
+          pago: `<b style="color:#e74c3c;">-$${parseFloat(p.monto).toFixed(2)}</b>`
+        });
+      });
+
+      items.sort((a, b) => b.fecha - a.fecha);
+
+      if (items.length === 0) return '<tr><td colspan="8" style="text-align:center;">Sin movimientos registrados para este criterio.</td></tr>';
+
+      return items.map(i => `
+        <tr>
+          <td>${i.fecha.toLocaleString()}</td>
+          <td>${i.codigo}</td>
+          <td>${i.producto}</td>
+          <td>${i.costo}</td>
+          <td>${i.precio}</td>
+          <td>${i.porcentaje}</td>
+          <td>${i.comision}</td>
+          <td>${i.pago}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function registrarPagoComision(comisionadoId, nombreComisionado, saldoDeudaActual) {
+      const montoInp = parseFloat(document.getElementById(`pago-monto-${comisionadoId}`).value);
+      const metodo = document.getElementById(`pago-metodo-${comisionadoId}`).value;
+      let tipo = document.getElementById(`pago-tipo-${comisionadoId}`).value;
+
+      if (isNaN(montoInp) || montoInp <= 0) {
+        return await customAlert("Ingrese un monto válido a pagar.");
+      }
+
+      if (tipo === 'adelanto' && saldoDeudaActual > 0) {
+        if (montoInp <= saldoDeudaActual) {
+          tipo = 'pago';
+          await customAlert(`El monto ($${montoInp.toFixed(2)}) fue clasificado automáticamente como "Pago de Comisión" para saldar parte de la deuda de $${saldoDeudaActual.toFixed(2)}.`, "Aviso Automático");
+        }
+      }
+
+      const conceptoEgreso = tipo === 'pago' ? `Pago de comisión - ${nombreComisionado}` : `Adelanto de comisión - ${nombreComisionado}`;
+      
+      await fetch(`${API}/egresos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoria: 'Sueldos',
+          concepto: conceptoEgreso,
+          monto: montoInp,
+          metodo_pago: metodo
+        })
+      });
+
+      await fetch(`${API}/comisiones/pagos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          comisionado_id: comisionadoId,
+          monto: montoInp,
+          metodo_pago: metodo,
+          tipo: tipo
+        })
+      });
+
+      await customAlert("Pago asentado correctamente y debitado en Egresos.");
+      cargarComisiones();
+      cargarEgresos();
+      cargarReportes();
+    }
+
     // GENERADOR DE INFORME FINANCIERO DETALLADO
     async function generarInformeDetallado() {
       const mes = document.getElementById('inf-mes').value;
@@ -1408,8 +1786,8 @@
                     <tr>
                       <td>${i.codigo}</td>
                       <td>${i.producto}</td>
-                      <td><b>${i.cantidad}</b></td>                       <td>$${i.precio_unitario.toFixed(2)}</td>
-                      <td>$${i.costo_unitario.toFixed(2)}</td>                       <td>$${i.subtotal.toFixed(2)}</td>
+                      <td><b>${i.cantidad}</b></td>                        <td>$${i.precio_unitario.toFixed(2)}</td>
+                      <td>$${i.costo_unitario.toFixed(2)}</td>                        <td>$${i.subtotal.toFixed(2)}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1435,7 +1813,7 @@
                   <td>${new Date(e.fecha).toLocaleDateString()}</td>
                   <td><b>${e.categoria}</b></td>
                   <td>${e.concepto}</td>
-                  <td>${e.metodo_pago}</td>                   <td style="color:#e74c3c; font-weight:bold;">-$${e.monto.toFixed(2)}</td>
+                  <td>${e.metodo_pago}</td>                    <td style="color:#e74c3c; font-weight:bold;">-$${e.monto.toFixed(2)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1465,29 +1843,31 @@
     }
 
     // ESCANEO AUTOMÁTICO CON ENTER PARA PISTOLA LECTORA
-['venta', 'pedido'].forEach(tipo => {
-  const input = document.getElementById(`buscar-${tipo}`);
-  if (!input) return;
+    ['venta', 'pedido'].forEach(tipo => {
+      const input = document.getElementById(`buscar-${tipo}`);
+      if (!input) return;
 
-  input.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const q = input.value.trim();
-      if (!q) return;
+      input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const q = input.value.trim();
+          if (!q) return;
 
-      const r = await fetch(`${API}/productos/buscar?q=${q}`);
-      const data = await r.json();
+          const r = await fetch(`${API}/productos/buscar?q=${q}`);
+          const data = await r.json();
 
-      if (data.length > 0) {
-        // Selecciona la coincidencia exacta del código o el primer resultado
-        const p = data.find(prod => prod.codigo_barras === q) || data[0];
-        agregarItem(tipo, p.id, p.nombre, p.precio, p.imagen || '', p.stock);
-        input.value = '';
-        document.getElementById(`sug-${tipo}`).style.display = 'none';
-      }
-    }
-  });
-});
+          if (data.length > 0) {
+            const p = data.find(prod => prod.codigo_barras === q) || data[0];
+            agregarItem(tipo, p.id, p.nombre, p.precio, p.imagen || '', p.stock);
+            input.value = '';
+            document.getElementById(`sug-${tipo}`).style.display = 'none';
+          }
+        }
+      });
+    });
+
+    // INICIALIZACIÓN
+    cargarComisionadosSelects();
   </script>
 </body>
 </html>
