@@ -3,183 +3,220 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Catálogo de Productos - BENEMEX</title>
+  <title>Catálogo BENEMEX</title>
   <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
-    body { background-color: #f4f6f9; color: #333; padding: 15px; }
+    * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f4f6f9; color: #333; padding: 20px; }
     
-    header { background-color: #2c3e50; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-    header img { max-width: 180px; height: auto; border-radius: 6px; margin-bottom: 10px; }
-    header h1 { font-size: 1.6rem; margin-bottom: 5px; }
-    
-    .filter-card { background: white; padding: 18px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end; }
-    .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; color: #555; }
-    input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
-    .btn-clear { padding: 10px 15px; background: #f39c12; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
-    .btn-clear:hover { background: #d35400; }
+    header {
+      background-color: #2c3e50;
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
 
-    .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; min-height: 300px; }
-    .product-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }
-    .product-card:hover { transform: translateY(-3px); }
-    
-    .img-container { width: 100%; height: 180px; background: #eef2f5; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .product-img { width: 100%; height: 100%; object-fit: cover; }
-    .no-img { font-size: 3rem; color: #bdc3c7; }
-    
-    .product-info { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-    .product-category { font-size: 0.78rem; color: #7f8c8d; margin-bottom: 6px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
-    .product-title { font-size: 1.05rem; font-weight: bold; color: #2c3e50; margin-bottom: 12px; line-height: 1.3; }
-    
-    .badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: bold; color: white; text-align: center; width: max-content; }
-    .badge-disponible { background-color: #27ae60; }
-    .badge-pocas { background-color: #e67e22; }
-    .badge-agotado { background-color: #e74c3c; }
-    
-    .no-results { grid-column: 1 / -1; text-align: center; padding: 40px; color: #7f8c8d; font-size: 1.1rem; }
+    .filter-bar {
+      display: flex;
+      gap: 15px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      flex-wrap: wrap;
+    }
 
-    /* SECCIÓN CANALES DE CONTACTO (FOOTER) */
-    footer { background-color: #2c3e50; color: white; padding: 25px 20px; border-radius: 8px; text-align: center; margin-top: 30px; }
-    footer h3 { font-size: 1.2rem; margin-bottom: 15px; font-weight: bold; }
-    .social-links { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-    .btn-social { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 25px; color: white; text-decoration: none; font-weight: bold; font-size: 0.9rem; transition: transform 0.2s, opacity 0.2s; }
-    .btn-social:hover { transform: translateY(-2px); opacity: 0.9; }
-    .btn-ws { background-color: #25D366; }
-    .btn-ig { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-    .btn-tt { background-color: #000000; border: 1px solid #444; }
+    .filter-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 0.95rem;
+    }
+
+    .grid-catalog {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .card-prod {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card-prod:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    }
+
+    .img-box {
+      width: 100%;
+      height: 200px;
+      background-color: #eef2f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .img-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .card-body {
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .prod-title {
+      font-size: 1.05rem;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .prod-code {
+      font-size: 0.8rem;
+      color: #7f8c8d;
+    }
+
+    .prod-price {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #27ae60;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .badge-disponible { background-color: #e8f8f5; color: #27ae60; border: 1px solid #a3e4d7; }
+    .badge-pocas { background-color: #fef9e7; color: #f39c12; border: 1px solid #f9e79f; }
+    .badge-agotado { background-color: #fadbd8; color: #e74c3c; border: 1px solid #f5b7b1; }
   </style>
 </head>
 <body>
 
   <header>
-    <img src="logo-home-cut.jpg" alt="Benemex Logo">
-    <h1>Catálogo de Productos - BENEMEX</h1>
-    <p style="font-size: 0.9rem; color: #bdc3c7;">Consulta la disponibilidad de nuestros artículos en tiempo real</p>
+    <h1>🌐 Catálogo BENEMEX</h1>
+    <p>Consulta de Productos y Disponibilidad de Inventario en Tiempo Real</p>
   </header>
 
-  <div class="filter-card">
-    <div class="filter-grid">
-      <div class="form-group">
-        <label for="search-name">Buscar por nombre de producto:</label>
-        <input type="text" id="search-name" placeholder="Escribe para buscar..." oninput="filtrarProductos()">
-      </div>
-      <div class="form-group">
-        <label for="filter-category">Filtrar por categoría:</label>
-        <select id="filter-category" onchange="filtrarProductos()">
-          <option value="">Todas las categorías</option>
-          <option value="Hogar">Hogar</option>
-          <option value="Anime/Juguetes">Anime/Juguetes</option>
-          <option value="Ropa">Ropa</option>
-        </select>
-      </div>
-      <div>
-        <button class="btn-clear" onclick="limpiarFiltros()">Limpiar Filtros</button>
-      </div>
+  <div class="filter-bar">
+    <div class="filter-group">
+      <input type="text" id="cat-busqueda" placeholder="🔍 Buscar producto por nombre o código..." oninput="filtrarCatalogo()">
+    </div>
+    <div class="filter-group">
+      <select id="cat-categoria" onchange="filtrarCatalogo()">
+        <option value="">-- Todas las Categorías --</option>
+        <option value="Hogar">Hogar</option>
+        <option value="Anime/Juguetes">Anime/Juguetes</option>
+        <option value="Ropa">Ropa</option>
+      </select>
     </div>
   </div>
 
-  <div id="catalog-grid" class="catalog-grid">
-    <!-- Carga dinámica de productos -->
-  </div>
-
-  <footer>
-    <h3>Nuestros Canales de Contacto</h3>
-    <div class="social-links">
-      <a href="https://wa.me/message/WECQSM4KKEUSO1" target="_blank" class="btn-social btn-ws">
-        💬 WhatsApp
-      </a>
-      <a href="https://www.instagram.com/benemexstor?stkn=MWhucG5nZGxwYmdncQ==" target="_blank" class="btn-social btn-ig">
-        📸 Instagram
-      </a>
-      <a href="https://www.tiktok.com/@benemexhome1?_r=1&_t=ZS-99vsEBMzuAZ" target="_blank" class="btn-social btn-tt">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 1 1-2.896-2.896c.216 0 .428.024.632.068V9.336a6.34 6.34 0 0 0-.632-.032 6.34 6.34 0 1 0 6.34 6.34V9.336a8.218 8.218 0 0 0 4.771 1.516V7.407a4.832 4.832 0 0 1-1.008-.721z"/>
-        </svg>
-        TikTok
-      </a>
-    </div>
-  </footer>
+  <div id="grid-productos" class="grid-catalog"></div>
 
   <script>
-    const API = '/api';
-    let productosMemoria = [];
+    const API = 'https://benemex-pos.onrender.com/api';
+    let productosCatalogo = [];
 
-    function parseImg(url) { 
-      if (!url) return ''; 
-      const match = url.match(/[-\w]{25,}/); 
-      return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url; 
+    function parseImg(url) {
+      if (!url) return '';
+      const match = url.match(/[-\w]{25,}/);
+      return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
+    }
+
+    // FUNCIÓN DE DISPONIBILIDAD CON CANTIDAD EXACTA
+    function obtenerEstadoDisponibilidad(stock) {
+      const cant = parseInt(stock) || 0;
+
+      if (cant > 5) {
+        return `<span class="badge badge-disponible">🟢 Disponible (${cant} u.)</span>`;
+      } else if (cant > 0) {
+        return `<span class="badge badge-pocas">⚠️ Pocas unidades (${cant} u.)</span>`;
+      } else {
+        const cantMostrar = cant < 0 ? 0 : cant;
+        return `<span class="badge badge-agotado">🔴 Agotado/Reestock (${cantMostrar} u.)</span>`;
+      }
     }
 
     async function cargarCatalogo() {
       try {
         const res = await fetch(`${API}/productos`);
-        productosMemoria = await res.json();
-        filtrarProductos();
-      } catch (err) {
-        console.error('Error al cargar productos:', err);
-        document.getElementById('catalog-grid').innerHTML = '<div class="no-results">Error al conectar con el catálogo. Por favor, reintente en unos momentos.</div>';
+        productosCatalogo = await res.json();
+        filtrarCatalogo();
+      } catch (e) {
+        console.error("Error al cargar productos del catálogo:", e);
       }
     }
 
-    function filtrarProductos() {
-      const qNombre = document.getElementById('search-name').value.toLowerCase().trim();
-      const qCat = document.getElementById('filter-category').value;
+    function filtrarCatalogo() {
+      const q = (document.getElementById('cat-busqueda').value || '').toLowerCase().trim();
+      const cat = document.getElementById('cat-categoria').value;
 
-      const filtrados = productosMemoria.filter(p => {
-        const coincideNombre = p.nombre.toLowerCase().includes(qNombre);
-        const coincideCat = qCat === '' || p.categoria === qCat;
-        return coincideNombre && coincideCat;
+      const filtrados = productosCatalogo.filter(p => {
+        if (cat && p.categoria !== cat) return false;
+        if (q) {
+          const nom = (p.nombre || '').toLowerCase();
+          const cod = (p.codigo_barras || '').toLowerCase();
+          if (!nom.includes(q) && !cod.includes(q)) return false;
+        }
+        return true;
       });
 
       renderGrid(filtrados);
     }
 
-    function limpiarFiltros() {
-      document.getElementById('search-name').value = '';
-      document.getElementById('filter-category').value = '';
-      filtrarProductos();
-    }
-
-    function renderGrid(productos) {
-      const container = document.getElementById('catalog-grid');
-      container.innerHTML = '';
-
-      if (productos.length === 0) {
-        container.innerHTML = '<div class="no-results">No se encontraron productos que coincidan con la búsqueda.</div>';
+    function renderGrid(lista) {
+      const container = document.getElementById('grid-productos');
+      if (lista.length === 0) {
+        container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #7f8c8d;">No se encontraron productos coincidentes.</p>';
         return;
       }
 
-      productos.forEach(p => {
-        let badgeHtml = '';
-        if (p.stock > 4) {
-          badgeHtml = '<span class="badge badge-disponible">Disponible</span>';
-        } else if (p.stock > 0 && p.stock <= 4) {
-          badgeHtml = '<span class="badge badge-pocas">Pocas Unidades</span>';
-        } else {
-          badgeHtml = '<span class="badge badge-agotado">Agotado</span>';
-        }
+      container.innerHTML = lista.map(p => {
+        const imgTag = p.imagen 
+          ? `<img src="${parseImg(p.imagen)}" alt="${p.nombre}">` 
+          : `<span style="font-size: 3rem;">📦</span>`;
 
-        const imgHtml = p.imagen 
-          ? `<img src="${parseImg(p.imagen)}" alt="${p.nombre}" class="product-img" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'no-img\'>📷</span>';">`
-          : '<span class="no-img">📷</span>';
+        const badgeDisponibilidad = obtenerEstadoDisponibilidad(p.stock);
 
-        container.innerHTML += `
-          <div class="product-card">
-            <div class="img-container">
-              ${imgHtml}
-            </div>
-            <div class="product-info">
-              <div>
-                <div class="product-category">${p.categoria || 'General'}</div>
-                <div class="product-title">${p.nombre}</div>
-              </div>
-              <div style="margin-top: 10px;">
-                ${badgeHtml}
-              </div>
+        return `
+          <div class="card-prod">
+            <div class="img-box">${imgTag}</div>
+            <div class="card-body">
+              <span class="prod-code">Cód: ${p.codigo_barras}</span>
+              <h3 class="prod-title">${p.nombre}</h3>
+              <div class="prod-price">$${parseFloat(p.precio).toFixed(2)}</div>
+              <div>${badgeDisponibilidad}</div>
             </div>
           </div>
         `;
-      });
+      }).join('');
     }
 
     cargarCatalogo();
