@@ -222,7 +222,7 @@
 
   <script>
     const API = 'https://benemex-pos.onrender.com/api';
-    const WHATSAPP_LINK = 'https://wa.me/message/WECQSM4KKEUSO1';
+    const TELEFONO_WHATSAPP = '5491124889545';
     let productosCatalogo = [];
 
     function parseImg(url) {
@@ -231,7 +231,7 @@
       return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
     }
 
-    // OBTENER ESTADO Y CANTIDAD EXACTA
+    // LÓGICA DE DISPONIBILIDAD CON STOCK EXACTO
     function obtenerEstadoDisponibilidad(stock) {
       const cant = parseInt(stock) || 0;
 
@@ -243,6 +243,21 @@
         const cantMostrar = cant < 0 ? 0 : cant;
         return `<span class="badge badge-agotado">🔴 Agotado/Reestock (${cantMostrar} u.)</span>`;
       }
+    }
+
+    // CONSTRUCTOR DEL ENLACE DE WHATSAPP SIN PRECIO
+    function generarLinkWhatsAppProd(p) {
+      const imgParsed = parseImg(p.imagen);
+      
+      let texto = `¡Hola! 👋 Quisiera consultar / pedir el siguiente producto:\n\n` +
+                  `📌 *Producto:* ${p.nombre}\n` +
+                  `🏷️ *Código:* ${p.codigo_barras}\n`;
+
+      if (imgParsed) {
+        texto += `🖼️ *Foto de referencia:* ${imgParsed}\n`;
+      }
+
+      return `https://wa.me/${TELEFONO_WHATSAPP}?text=${encodeURIComponent(texto)}`;
     }
 
     async function cargarCatalogo() {
@@ -285,6 +300,7 @@
           : `<span style="font-size: 3rem;">📦</span>`;
 
         const badgeDisponibilidad = obtenerEstadoDisponibilidad(p.stock);
+        const linkWaProd = generarLinkWhatsAppProd(p);
 
         return `
           <div class="card-prod">
@@ -294,7 +310,7 @@
               <h3 class="prod-title">${p.nombre}</h3>
               <div class="prod-price">$${parseFloat(p.precio).toFixed(2)}</div>
               <div>${badgeDisponibilidad}</div>
-              <a href="${WHATSAPP_LINK}" target="_blank" class="btn-wa-prod">📱 Pedir por WhatsApp</a>
+              <a href="${linkWaProd}" target="_blank" class="btn-wa-prod">📱 Pedir por WhatsApp</a>
             </div>
           </div>
         `;
