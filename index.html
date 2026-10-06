@@ -46,6 +46,70 @@
       #modal-informe-detallado { position: absolute; left: 0; top: 0; width: 100%; height: auto; background: white; display: block !important; }
       .no-print { display: none !important; }
     }
+    
+    /* ==========================================================================
+   SCROLL INDEPENDIENTE Y ENCABEZADOS FIJOS PARA TODAS LAS LISTAS E HISTORIALES
+   ========================================================================== */
+
+/* Contenedor automatico con scroll vertical independiente para cualquier tabla o historial */
+div:has(> table),
+.table-container,
+.tabla-container,
+.table-responsive,
+.historial-container,
+.lista-container {
+  max-height: 480px;            /* Altura maxima de la lista antes de activar scroll */
+  overflow-y: auto;             /* Habilita la barra de desplazamiento propia */
+  overflow-x: auto;             /* Habilita desplazamiento horizontal si la tabla es muy ancha */
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Mantener el encabezado de las tablas fijo al hacer scroll en la lista */
+table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #2c3e50;    /* Color principal del encabezado */
+  color: #ffffff;
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.15);
+}
+
+/* Personalización estética de la barra de desplazamiento interna */
+div:has(> table)::-webkit-scrollbar,
+.table-container::-webkit-scrollbar,
+.tabla-container::-webkit-scrollbar,
+.historial-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+div:has(> table)::-webkit-scrollbar-track,
+.table-container::-webkit-scrollbar-track,
+.tabla-container::-webkit-scrollbar-track,
+.historial-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+div:has(> table)::-webkit-scrollbar-thumb,
+.table-container::-webkit-scrollbar-thumb,
+.tabla-container::-webkit-scrollbar-thumb,
+.historial-container::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+div:has(> table)::-webkit-scrollbar-thumb:hover,
+.table-container::-webkit-scrollbar-thumb:hover,
+.tabla-container::-webkit-scrollbar-thumb:hover,
+.historial-container::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
   </style>
 </head>
 <body>
