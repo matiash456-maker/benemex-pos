@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -229,7 +230,7 @@
 
   <script>
     const API = 'https://benemex-pos.onrender.com/api';
-    const LINK_WHATSAPP_BASE = 'https://wa.me/message/WECQSM4KKEUSO1';
+    const TELEFONO_WHATSAPP = '5491124889545';
     let productosCatalogo = [];
 
     function parseImg(url) {
@@ -252,7 +253,7 @@
       }
     }
 
-    // MENSAJE DE WHATSAPP CON CÓDIGO, NOMBRE Y URL DE FOTO VINCULADO AL CANAL OFICIAL
+    // GENERACIÓN DE ENLACE DIRECTO A API DE WHATSAPP CON TEXTO PRECARGADO
     function generarLinkWhatsAppProd(p) {
       const imgParsed = parseImg(p.imagen);
       
@@ -264,7 +265,7 @@
         texto += `🖼️ *Foto de referencia:* ${imgParsed}\n`;
       }
 
-      return `${LINK_WHATSAPP_BASE}?text=${encodeURIComponent(texto)}`;
+      return `https://api.whatsapp.com/send?phone=${TELEFONO_WHATSAPP}&text=${encodeURIComponent(texto)}`;
     }
 
     async function cargarCatalogo() {
