@@ -11,19 +11,31 @@
     header {
       background-color: #2c3e50;
       color: white;
-      padding: 20px;
+      padding: 25px 20px;
       border-radius: 8px;
       margin-bottom: 20px;
       text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .header-logo {
+      max-width: 180px;
+      height: auto;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
 
     header h1 {
       margin-bottom: 5px;
+      font-size: 1.8rem;
     }
 
     header p {
       color: #bdc3c7;
-      margin-bottom: 15px;
+      margin-bottom: 18px;
       font-size: 0.95rem;
     }
 
@@ -132,7 +144,7 @@
       padding: 15px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
     }
 
     .prod-title {
@@ -146,17 +158,11 @@
       color: #7f8c8d;
     }
 
-    .prod-price {
-      font-size: 1.25rem;
-      font-weight: bold;
-      color: #27ae60;
-    }
-
     .badge {
       display: inline-block;
-      padding: 5px 10px;
+      padding: 6px 12px;
       border-radius: 4px;
-      font-size: 0.85rem;
+      font-size: 0.88rem;
       font-weight: bold;
       width: fit-content;
     }
@@ -172,10 +178,10 @@
       background-color: #25d366;
       color: white;
       text-decoration: none;
-      padding: 8px 0;
+      padding: 10px 0;
       border-radius: 5px;
       font-weight: bold;
-      font-size: 0.88rem;
+      font-size: 0.9rem;
       margin-top: 5px;
       transition: background-color 0.2s;
     }
@@ -188,6 +194,7 @@
 <body>
 
   <header>
+    <img src="logo-home-cut.jpg" alt="BENEMEX Logo" class="header-logo" onerror="this.style.display='none'">
     <h1>🌐 Catálogo BENEMEX</h1>
     <p>Consulta de Productos y Disponibilidad de Inventario en Tiempo Real</p>
 
@@ -231,7 +238,7 @@
       return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
     }
 
-    // LÓGICA DE DISPONIBILIDAD CON STOCK EXACTO
+    // DISPONIBILIDAD CON CANTIDADES EN TIEMPO REAL
     function obtenerEstadoDisponibilidad(stock) {
       const cant = parseInt(stock) || 0;
 
@@ -245,7 +252,7 @@
       }
     }
 
-    // CONSTRUCTOR DEL ENLACE DE WHATSAPP SIN PRECIO
+    // MENSAJE DE WHATSAPP CON CÓDIGO, NOMBRE Y URL DE FOTO
     function generarLinkWhatsAppProd(p) {
       const imgParsed = parseImg(p.imagen);
       
@@ -257,7 +264,7 @@
         texto += `🖼️ *Foto de referencia:* ${imgParsed}\n`;
       }
 
-      return `https://wa.me/${TELEFONO_WHATSAPP}?text=${encodeURIComponent(texto)}`;
+      return `https://api.whatsapp.com/send?phone=${TELEFONO_WHATSAPP}&text=${encodeURIComponent(texto)}`;
     }
 
     async function cargarCatalogo() {
@@ -308,7 +315,6 @@
             <div class="card-body">
               <span class="prod-code">Cód: ${p.codigo_barras}</span>
               <h3 class="prod-title">${p.nombre}</h3>
-              <div class="prod-price">$${parseFloat(p.precio).toFixed(2)}</div>
               <div>${badgeDisponibilidad}</div>
               <a href="${linkWaProd}" target="_blank" class="btn-wa-prod">📱 Pedir por WhatsApp</a>
             </div>
