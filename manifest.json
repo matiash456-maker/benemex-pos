@@ -1,21 +1,16 @@
 {
-  "name": "BENEMEX POS",
+  "name": "POS BENEMEX Móvil",
   "short_name": "BENEMEX",
   "start_url": "/mobile.html",
   "display": "standalone",
   "background_color": "#2c3e50",
   "theme_color": "#2c3e50",
-  "orientation": "portrait",
   "icons": [
     {
-      "src": "logo-home-cut.jpg",
-      "sizes": "192x192",
-      "type": "image/jpeg"
-    },
-    {
-      "src": "logo-home-cut.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg"
+      "src": "https://cdn-icons-png.flaticon.com/512/1041/1041888.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
