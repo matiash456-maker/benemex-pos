@@ -94,19 +94,19 @@
       <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
         <div class="form-group">
           <label>Cliente (Opcional):</label>
-          <input type="text" id="m-cliente" placeholder="Nombre del cliente">
+          <input type="text" id="m-cliente" placeholder="Nombre del cliente" oninput="guardarEstadoCarrito()">
         </div>
 
         <div class="form-group">
           <label>Vendedor / Comisionado:</label>
-          <select id="m-comisionado">
+          <select id="m-comisionado" onchange="guardarEstadoCarrito()">
             <option value="">Venta del Local (Sin comisión)</option>
           </select>
         </div>
 
         <div class="form-group">
           <label>Método de Pago:</label>
-          <select id="m-metodo-pago" onchange="toggleCampoComprobanteVenta()">
+          <select id="m-metodo-pago" onchange="toggleCampoComprobanteVenta(); guardarEstadoCarrito();">
             <option value="efectivo">💵 Efectivo</option>
             <option value="transferencia">🏦 Transferencia</option>
             <option value="tarjeta">💳 Tarjeta</option>
@@ -228,9 +228,78 @@
     let fotoVentaComprobanteNombre = '';
     let fotoVentaComprobanteFile = null;
 
+    // CONVERSIÓN DE BASE64 A ARCHIVO (UTILIZADO PARA RESTAURAR TRAS REINICIO DE CÁMARA)
+    function dataURLtoFile(dataurl, filename) {
+      try {
+        let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+            bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+        while(n--){
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, {type:mime});
+      } catch(e) {
+        return null;
+      }
+    }
+
+    // GUARDAR Y RESTAURAR ESTADO DEL CARRITO EN LOCALSTORAGE
+    function guardarEstadoCarrito() {
+      try {
+        localStorage.setItem('benemex_carrito', JSON.stringify(carritoMovil));
+        localStorage.setItem('benemex_cliente', document.getElementById('m-cliente')?.value || '');
+        localStorage.setItem('benemex_metodo', document.getElementById('m-metodo-pago')?.value || 'efectivo');
+        localStorage.setItem('benemex_comisionado', document.getElementById('m-comisionado')?.value || '');
+        localStorage.setItem('benemex_recargo', document.getElementById('m-recargo')?.value || '0');
+      } catch(e) {}
+    }
+
+    function restaurarEstadoCarrito() {
+      try {
+        const car = localStorage.getItem('benemex_carrito');
+        if (car) carritoMovil = JSON.parse(car) || [];
+        
+        const cli = localStorage.getItem('benemex_cliente');
+        if (cli && document.getElementById('m-cliente')) document.getElementById('m-cliente').value = cli;
+
+        const met = localStorage.getItem('benemex_metodo');
+        if (met && document.getElementById('m-metodo-pago')) {
+          document.getElementById('m-metodo-pago').value = met;
+          toggleCampoComprobanteVenta();
+        }
+
+        const com = localStorage.getItem('benemex_comisionado');
+        if (com && document.getElementById('m-comisionado')) document.getElementById('m-comisionado').value = com;
+
+        const rec = localStorage.getItem('benemex_recargo');
+        if (rec && document.getElementById('m-recargo')) document.getElementById('m-recargo').value = rec;
+
+        const imgB64 = localStorage.getItem('benemex_comprobante_b64');
+        const imgName = localStorage.getItem('benemex_comprobante_nombre');
+        if (imgB64 && imgName) {
+          fotoVentaComprobanteFile = dataURLtoFile(imgB64, imgName);
+          fotoVentaComprobanteNombre = imgName;
+          const prev = document.getElementById('m-v-comprobante-preview');
+          if (prev) prev.innerHTML = `<img src="${imgB64}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #2980b9;">`;
+        }
+      } catch(e) {}
+    }
+
+    function limpiarEstadoCarritoGuardado() {
+      try {
+        localStorage.removeItem('benemex_carrito');
+        localStorage.removeItem('benemex_cliente');
+        localStorage.removeItem('benemex_metodo');
+        localStorage.removeItem('benemex_comisionado');
+        localStorage.removeItem('benemex_recargo');
+        localStorage.removeItem('benemex_comprobante_b64');
+        localStorage.removeItem('benemex_comprobante_nombre');
+      } catch(e) {}
+    }
+
     function formatearFecha24hs(fechaStr) {
       if (!fechaStr) return '-';
-      const d = new Date(fechaStr);
+      const cleanStr = String(fechaStr).replace(' ', 'T');
+      const d = new Date(cleanStr);
       if (isNaN(d.getTime())) return fechaStr;
       return d.toLocaleString('es-AR', { hour12: false });
     }
@@ -262,6 +331,10 @@
         document.getElementById('m-v-comprobante-preview').innerHTML = '';
         fotoVentaComprobanteNombre = '';
         fotoVentaComprobanteFile = null;
+        try {
+          localStorage.removeItem('benemex_comprobante_b64');
+          localStorage.removeItem('benemex_comprobante_nombre');
+        } catch(e) {}
       }
     }
 
@@ -272,13 +345,22 @@
         fotoVentaComprobanteNombre = input.files[0].name;
         const reader = new FileReader();
         reader.onload = function(e) {
-          prev.innerHTML = `<img src="${e.target.result}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #2980b9;">`;
+          const b64 = e.target.result;
+          prev.innerHTML = `<img src="${b64}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #2980b9;">`;
+          try {
+            localStorage.setItem('benemex_comprobante_b64', b64);
+            localStorage.setItem('benemex_comprobante_nombre', fotoVentaComprobanteNombre);
+          } catch(err) {}
         }
         reader.readAsDataURL(input.files[0]);
       } else {
         prev.innerHTML = '';
         fotoVentaComprobanteNombre = '';
         fotoVentaComprobanteFile = null;
+        try {
+          localStorage.removeItem('benemex_comprobante_b64');
+          localStorage.removeItem('benemex_comprobante_nombre');
+        } catch(e) {}
       }
     }
 
@@ -291,12 +373,14 @@
         if (sel) {
           sel.innerHTML = '<option value="">Venta del Local (Sin comisión)</option>' +
             coms.map(c => `<option value="${c.id}">${c.nombre} (${c.porcentaje}%)</option>`).join('');
+          
+          const savedCom = localStorage.getItem('benemex_comisionado');
+          if (savedCom) sel.value = savedCom;
         }
       } catch (e) {
         console.error("Error al cargar comisionados en móvil:", e);
       }
     }
-    cargarComisionadosMovil();
 
     function abrirEscanerCamara() {
       document.getElementById('modal-escaner').style.display = 'flex';
@@ -423,6 +507,8 @@
 
     function renderCarritoMovil() {
       const cont = document.getElementById('m-carrito-lista');
+      guardarEstadoCarrito();
+
       if (carritoMovil.length === 0) {
         cont.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">El carrito está vacío</p>';
         document.getElementById('m-cart-total').innerText = '$0.00';
@@ -545,6 +631,7 @@
           }
 
           carritoMovil = [];
+          limpiarEstadoCarritoGuardado();
           document.getElementById('m-cliente').value = '';
           document.getElementById('m-recargo').value = '0';
           document.getElementById('m-metodo-pago').value = 'efectivo';
@@ -813,10 +900,15 @@
     async function compartirWhatsApp(texto, archivo = null) {
       if (archivo && navigator.share && navigator.canShare) {
         try {
-          if (navigator.canShare({ files: [archivo] })) {
+          let fileToShare = archivo;
+          if (!(archivo instanceof File)) {
+            fileToShare = new File([archivo], archivo.name || 'comprobante.jpg', { type: archivo.type || 'image/jpeg' });
+          }
+
+          if (navigator.canShare({ files: [fileToShare] })) {
             await navigator.share({
               text: texto,
-              files: [archivo]
+              files: [fileToShare]
             });
             return;
           }
@@ -827,6 +919,13 @@
       const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
       window.open(url, '_blank');
     }
+
+    // INICIALIZACIÓN Y RESTAURACIÓN AUTOMÁTICA
+    window.addEventListener('DOMContentLoaded', () => {
+      restaurarEstadoCarrito();
+      cargarComisionadosMovil();
+      renderCarritoMovil();
+    });
   </script>
 </body>
 </html>
