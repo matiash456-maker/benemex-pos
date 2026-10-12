@@ -47,7 +47,6 @@
       .no-print { display: none !important; }
     }
     
-    /* SCROLL INDEPENDIENTE Y ENCABEZADOS FIJOS PARA TABLAS E HISTORIALES */
     div:has(> table),
     .table-container,
     .tabla-container,
@@ -147,7 +146,7 @@
       <h1>🛒 Sistema POS BENEMEX por MH</h1>
       <small id="caja-header-info" style="color:#bdc3c7;"></small>
     </div>
-    <span id="hora-actual"></span>
+    <span id="hora-actual" style="font-weight:bold; font-size:1.1rem;"></span>
   </header>
 
   <div class="nav-tabs">
@@ -232,7 +231,7 @@
       </div>
 
       <table>
-        <thead><tr><th>ID Venta</th><th>Código Pedido</th><th>Cliente</th><th>Fecha</th><th>Total Final</th><th>Acción</th></tr></thead>
+        <thead><tr><th>ID Venta</th><th>Código Pedido</th><th>Cliente</th><th>Fecha</th><th>Total Final</th><th>Estado / Acción</th></tr></thead>
         <tbody id="historial-ventas"></tbody>
       </table>
     </div>
@@ -242,6 +241,11 @@
     <div class="card" style="width: 700px; max-height:85vh; overflow-y:auto; overflow-x:visible;">
       <h2 style="margin-bottom:15px; display:flex; justify-content:space-between;">Detalles de Venta <button onclick="document.getElementById('modal-venta').style.display='none'" class="btn btn-danger">X</button></h2>
       <div id="v-detalle-financiero" class="detalle-fin"></div>
+      
+      <div id="v-aviso-devuelta" style="display:none; background:#e74c3c; color:white; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold; text-align:center;">
+        🛑 ESTA VENTA FUE DEVUELTA EN SU TOTALIDAD. NO ES POSIBLE REALIZAR NUEVAS MODIFICACIONES NI DEVOLUCIONES.
+      </div>
+
       <div id="v-aviso-pedido" style="display:none; background:#f39c12; color:white; padding:10px; border-radius:5px; margin-bottom:15px; font-weight:bold;">
         ⚠ Esta venta proviene de un Pedido de Logística. Para modificar productos o procesar devoluciones debes ir a la sección "Pedidos Logística".
       </div>
@@ -758,8 +762,18 @@
     let ventasComisionesMemoria = [];
     let pagosComisionesMemoria = [];
 
+    // FORMATO DE HORA EN 24 HORAS
+    function formatearFecha24hs(fechaStr) {
+      if (!fechaStr) return '-';
+      const d = new Date(fechaStr);
+      if (isNaN(d.getTime())) return fechaStr;
+      return d.toLocaleString('es-AR', { hour12: false });
+    }
+
     document.getElementById('mes-filtro').value = new Date().toISOString().slice(0,7);
-    setInterval(() => document.getElementById('hora-actual').innerText = new Date().toLocaleString(), 1000);
+    setInterval(() => {
+      document.getElementById('hora-actual').innerText = formatearFecha24hs(new Date());
+    }, 1000);
 
     // SISTEMA ASÍNCRONO DE MODALES HTML
     function customAlert(msg, title = "Aviso") {
@@ -942,7 +956,7 @@
         }
         
         return `<tr>
-          <td>${i.fecha_cierre ? new Date(i.fecha_cierre).toLocaleString() : '-'}</td>
+          <td>${formatearFecha24hs(i.fecha_cierre)}</td>
           <td><b>${i.personal || '-'}</b></td>
           <td style="font-weight:bold; color:#2980b9; background-color:#f8fafc;">$${(i.monto_inicial || 0).toFixed(2)}</td>
           <td>$${esperado.toFixed(2)}</td>
@@ -961,7 +975,7 @@
       const box = document.getElementById(`sug-${tipo}`);
       if(q.length < 2) return box.style.display = 'none';
       const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = '';
-      data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItem('${tipo}', ${p.id}, '${p.nombre}', ${p.precio}, '${p.imagen||''}', ${p.stock})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio}) [Stock: ${p.stock}]</div>`; });
+      data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItem('${tipo}', ${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, '${p.imagen||''}', ${p.stock})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio}) [Stock: ${p.stock}]</div>`; });
       box.style.display = 'block';
     }
 
@@ -1111,7 +1125,7 @@
       const prods = await r.json();
       box.innerHTML = '';
       prods.forEach(p => {
-        box.innerHTML += `<div class="sug-item" onclick="seleccionarProdReingreso(${p.id}, '${p.nombre}', '${p.codigo_barras}', ${p.stock})"><b>${p.codigo_barras}</b> - ${p.nombre} (Stock actual: ${p.stock})</div>`;
+        box.innerHTML += `<div class="sug-item" onclick="seleccionarProdReingreso(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.codigo_barras}', ${p.stock})"><b>${p.codigo_barras}</b> - ${p.nombre} (Stock actual: ${p.stock})</div>`;
       });
       box.style.display = 'block';
     }
@@ -1161,7 +1175,7 @@
 
       document.getElementById('tabla-inventario').innerHTML = prodsFiltrados.map(i => {
         const stockStr = i.stock < 0 ? `<b style="color:#e74c3c;">${i.stock} (A reingresar)</b>` : `<b>${i.stock}</b>`;
-        return `<tr><td>${i.imagen ? `<img src="${parseImg(i.imagen)}" class="prod-img">` : '📷'}</td><td>${i.codigo_barras}</td><td>${i.nombre}</td><td>${i.categoria}</td><td>$${i.precio}</td><td>${stockStr}</td><td><button class="btn btn-warning" onclick="editarProducto(${i.id}, '${i.codigo_barras}', '${i.nombre}', '${i.categoria}', ${i.costo}, ${i.precio}, ${i.stock}, '${i.imagen||''}')">Editar</button> <button class="btn btn-danger" onclick="borrarProd(${i.id})">X</button></td></tr>`;
+        return `<tr><td>${i.imagen ? `<img src="${parseImg(i.imagen)}" class="prod-img">` : '📷'}</td><td>${i.codigo_barras}</td><td>${i.nombre}</td><td>${i.categoria}</td><td>$${i.precio}</td><td>${stockStr}</td><td><button class="btn btn-warning" onclick="editarProducto(${i.id}, '${i.codigo_barras}', '${i.nombre.replace(/'/g, "\\'")}', '${i.categoria}', ${i.costo}, ${i.precio}, ${i.stock}, '${i.imagen||''}')">Editar</button> <button class="btn btn-danger" onclick="borrarProd(${i.id})">X</button></td></tr>`;
       }).join('');
     }
 
@@ -1178,7 +1192,7 @@
         if (x.tipo === 'Alta / Creación') badgeColor = '#2980b9';
         if (x.tipo === 'Edición Manual') badgeColor = '#f39c12';
         const cantStr = x.cantidad > 0 ? `+${x.cantidad}` : `${x.cantidad}`;
-        return `<tr><td>${new Date(x.fecha).toLocaleString()}</td><td><b>${x.producto_nombre}</b></td><td>${x.categoria}</td><td><b>${cantStr}</b></td><td><span class="badge" style="background:${badgeColor}">${x.tipo}</span></td><td>${x.detalle||''}</td></tr>`;
+        return `<tr><td>${formatearFecha24hs(x.fecha)}</td><td><b>${x.producto_nombre}</b></td><td>${x.categoria}</td><td><b>${cantStr}</b></td><td><span class="badge" style="background:${badgeColor}">${x.tipo}</span></td><td>${x.detalle||''}</td></tr>`;
       }).join('');
     }
 
@@ -1223,7 +1237,7 @@
         const subtotal = catEgs.reduce((acc, c) => acc + c.monto, 0);
         html.push(`<div class="egreso-cat" onclick="toggleCat('${cat.replace(/\s+/g, '')}')">📁 ${cat} - Gasto Total: $${subtotal.toFixed(2)}</div>`);
         html.push(`<div class="egreso-det" id="cat-${cat.replace(/\s+/g, '')}"><table><thead><tr><th>Fecha</th><th>Detalle</th><th>Pago en</th><th>Monto</th><th>Acción</th></tr></thead><tbody>`);
-        catEgs.forEach(i => { html.push(`<tr><td>${new Date(i.fecha).toLocaleDateString()}</td><td>${i.concepto}</td><td>${i.metodo_pago}</td><td>$${i.monto.toFixed(2)}</td><td><button class="btn btn-warning" onclick="editarEgreso(${i.id}, '${i.categoria}', '${i.concepto}', ${i.monto}, '${i.metodo_pago}')">Editar</button> <button class="btn btn-danger" onclick="borrarEgreso(${i.id})">X</button></td></tr>`); });
+        catEgs.forEach(i => { html.push(`<tr><td>${formatearFecha24hs(i.fecha)}</td><td>${i.concepto}</td><td>${i.metodo_pago}</td><td>$${i.monto.toFixed(2)}</td><td><button class="btn btn-warning" onclick="editarEgreso(${i.id}, '${i.categoria}', '${i.concepto}', ${i.monto}, '${i.metodo_pago}')">Editar</button> <button class="btn btn-danger" onclick="borrarEgreso(${i.id})">X</button></td></tr>`); });
         html.push(`</tbody></table></div>`);
       });
       document.getElementById('acordeon-egresos').innerHTML = html.join('');
@@ -1236,7 +1250,7 @@
       } 
     }
 
-    // HISTORIAL VENTAS DIRECTAS CON FILTROS DINÁMICOS Y RESALTADO DE DEVOLUCIONES
+    // HISTORIAL VENTAS DIRECTAS CON MANEJO DE DEVOLUCIONES
     async function cargarHistorialVentas() {
       const r = await fetch(`${API}/ventas`); 
       ventasMemoria = await r.json();
@@ -1275,19 +1289,23 @@
 
       document.getElementById('historial-ventas').innerHTML = filtradas.map(x => {
         const esDevuelta = Boolean(x.devuelta == 1 || x.estado === 'Devuelto' || x.estado === 'devuelto');
-        const estiloFila = esDevuelta ? 'style="background-color: #fff5f5;"' : '';
-        const totalTxt = esDevuelta 
+        const estiloFila = esDevuelta ? 'style="background-color: #fff0f0;"' : '';
+        const estadoBadge = esDevuelta 
           ? `<span class="badge" style="background:#e74c3c;">DEVUELTA (-$${x.total.toFixed(2)})</span>` 
-          : `$${x.total.toFixed(2)}`;
+          : `<span class="badge" style="background:#27ae60;">COMPLETADA ($${x.total.toFixed(2)})</span>`;
 
         return `
           <tr ${estiloFila}>
             <td>#${x.id}</td>
             <td><b style="color:#2980b9;">${x.codigo_pedido ? x.codigo_pedido : '-'}</b></td>
             <td><b>${x.cliente_nombre}</b></td>
-            <td>${new Date(x.fecha).toLocaleString()}</td>
-            <td>${totalTxt}</td>
-            <td><button class="btn btn-warning" onclick="verVenta(${x.id})">Ver Detalles / Modificar</button></td>
+            <td>${formatearFecha24hs(x.fecha)}</td>
+            <td>${estadoBadge}</td>
+            <td>
+              <button class="btn ${esDevuelta ? 'btn-primary' : 'btn-warning'}" onclick="verVenta(${x.id})">
+                ${esDevuelta ? 'Ver Detalles' : 'Ver / Modificar'}
+              </button>
+            </td>
           </tr>`;
       }).join('');
     }
@@ -1303,14 +1321,26 @@
     async function verVenta(id) {
       ventaActiva = id; const r = await fetch(`${API}/ventas/${id}/detalles`); const data = await r.json();
       const v = data.venta;
+      const esDevuelta = Boolean(v.devuelta == 1 || v.estado === 'Devuelto');
+
       document.getElementById('v-detalle-financiero').innerHTML = `RESUMEN DE PAGOS Y DESCUENTOS:<br>Cliente: ${v.cliente_nombre}<br>Subtotal base: $${v.subtotal.toFixed(2)} | Descuento: $${v.descuento.toFixed(2)}<br>💵 Ef: $${v.pago_efectivo.toFixed(2)} | 💳 Tarj: $${v.pago_tarjeta.toFixed(2)} | 🏦 Tr: $${v.pago_transferencia.toFixed(2)} | 📱 QR: $${v.pago_qr.toFixed(2)}`;
       
-      if (data.es_pedido) {
-        document.getElementById('v-aviso-pedido').style.display = 'block';
-        document.getElementById('v-acciones-modificacion').style.display = 'none';
+      const avisoDev = document.getElementById('v-aviso-devuelta');
+      const avisoPed = document.getElementById('v-aviso-pedido');
+      const accionesAcc = document.getElementById('v-acciones-modificacion');
+
+      if (esDevuelta) {
+        avisoDev.style.display = 'block';
+        avisoPed.style.display = 'none';
+        accionesAcc.style.display = 'none';
+      } else if (data.es_pedido) {
+        avisoDev.style.display = 'none';
+        avisoPed.style.display = 'block';
+        accionesAcc.style.display = 'none';
       } else {
-        document.getElementById('v-aviso-pedido').style.display = 'none';
-        document.getElementById('v-acciones-modificacion').style.display = 'block';
+        avisoDev.style.display = 'none';
+        avisoPed.style.display = 'none';
+        accionesAcc.style.display = 'block';
 
         document.getElementById('tabla-detalles-venta').innerHTML = data.items.map(i => `
           <tr>
@@ -1339,7 +1369,11 @@
         metReembolso = await obtenerMetodoReembolso();
       }
 
-      await fetch(`${API}/ventas/${ventaActiva}/modificar-cantidad`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({detalle_id: detalleId, nueva_cantidad: nuevaCant, metodo_reembolso: metReembolso})});
+      const res = await fetch(`${API}/ventas/${ventaActiva}/modificar-cantidad`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({detalle_id: detalleId, nueva_cantidad: nuevaCant, metodo_reembolso: metReembolso})});
+      if (!res.ok) {
+        const err = await res.json();
+        return await customAlert(err.error || 'No se pudo realizar la acción.');
+      }
       verVenta(ventaActiva); cargarHistorialVentas(); cargarInventario(); cargarDevoluciones(); cargarReportes();
     }
 
@@ -1347,7 +1381,7 @@
       const box = document.getElementById('sug-editar-venta');
       if(q.length < 2) return box.style.display = 'none';
       const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = '';
-      data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAVenta(${p.id}, '${p.nombre}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; });
+      data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAVenta(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; });
       box.style.display = 'block';
     }
     async function agregarItemAVenta(id, nombre, precio) {
@@ -1359,7 +1393,11 @@
     async function devolverVentaTotal() {
       if(!await customConfirm('¿Estás seguro de devolver y cancelar TODOS los productos de esta venta?')) return;
       const metReembolso = await obtenerMetodoReembolso();
-      await fetch(`${API}/ventas/${ventaActiva}/devolver-total`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({metodo_reembolso: metReembolso})});
+      const res = await fetch(`${API}/ventas/${ventaActiva}/devolver-total`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({metodo_reembolso: metReembolso})});
+      if (!res.ok) {
+        const err = await res.json();
+        return await customAlert(err.error || 'Error al procesar la devolución.');
+      }
       document.getElementById('modal-venta').style.display = 'none'; cargarHistorialVentas(); cargarInventario(); cargarDevoluciones(); cargarPedidos(); cargarReportes();
     }
     
@@ -1471,7 +1509,7 @@
       verDetallesPedido(pedidoActivoModal); cargarPedidos(); cargarHistorialVentas(); cargarDevoluciones(); cargarInventario(); cargarReportes();
     }
 
-    async function buscarSugerenciasEditar(q) { const box = document.getElementById('sug-editar-pedido'); if(q.length < 2) return box.style.display = 'none'; const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = ''; data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAPedido(${p.id}, '${p.nombre}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; }); box.style.display = 'block'; }
+    async function buscarSugerenciasEditar(q) { const box = document.getElementById('sug-editar-pedido'); if(q.length < 2) return box.style.display = 'none'; const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = ''; data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAPedido(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; }); box.style.display = 'block'; }
     async function agregarItemAPedido(id, nombre, precio) { await fetch(`${API}/pedidos/${pedidoActivoModal}/agregar-item`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_id: id, cantidad: 1, precio: precio})}); document.getElementById('buscar-editar-pedido').value = ''; document.getElementById('sug-editar-pedido').style.display = 'none'; cargarPedidos(); verDetallesPedido(pedidoActivoModal); cargarHistorialVentas(); cargarDevoluciones(); cargarReportes(); cargarInventario(); }
     
     async function cancelarPedidoTotal(id) { 
@@ -1493,7 +1531,7 @@
       const r = await fetch(`${API}/devoluciones`); const d = await r.json();
       document.getElementById('tabla-devoluciones').innerHTML = d.map(i => `
         <tr>
-          <td>${new Date(i.fecha).toLocaleString()}</td>
+          <td>${formatearFecha24hs(i.fecha)}</td>
           <td><span class="badge" style="background:#34495e">${i.origen}</span></td>
           <td><small>${i.detalles}</small></td>
           <td><b style="color:#e74c3c">-$${i.total_monto.toFixed(2)}</b></td>
@@ -1657,7 +1695,7 @@
                 <option value="adelanto">Adelanto de Comisiones</option>
               </select>
 
-              <button class="btn btn-success" onclick="registrarPagoComision(${c.id}, '${c.nombre}', ${saldoDeuda})" style="margin-bottom:0;">Registrar y Liquidar</button>
+              <button class="btn btn-success" onclick="registrarPagoComision(${c.id}, '${c.nombre.replace(/'/g, "\\'")}', ${saldoDeuda})" style="margin-bottom:0;">Registrar y Liquidar</button>
             </div>
           </div>
 
@@ -1727,7 +1765,7 @@
 
       return items.map(i => `
         <tr>
-          <td>${i.fecha.toLocaleString()}</td>
+          <td>${formatearFecha24hs(i.fecha)}</td>
           <td>${i.codigo}</td>
           <td>${i.producto}</td>
           <td>${i.costo}</td>
@@ -1806,7 +1844,7 @@
       let html = `
         <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #fff;">
           <h2 style="text-align: center; color: #2c3e50; margin-bottom: 5px;">BENEMEX - INFORME OPERATIVO DETALLADO</h2>
-          <p style="text-align: center; color: #666; margin-bottom: 20px;">Fecha de emisión: ${new Date().toLocaleString()}</p>
+          <p style="text-align: center; color: #666; margin-bottom: 20px;">Fecha de emisión: ${formatearFecha24hs(new Date())}</p>
           
           <table style="margin-bottom: 25px; background: #f8fafc;">
             <thead>
@@ -1841,7 +1879,7 @@
           html += `
             <div style="border: 1px solid #e2e8f0; margin-bottom: 15px; border-radius: 6px; padding: 10px;">
               <div style="display: flex; justify-content: space-between; background: #eef2f5; padding: 6px 10px; font-weight: bold;">
-                <span>Venta #${v.id} - Cliente: ${v.cliente} (${new Date(v.fecha).toLocaleString()})</span>
+                <span>Venta #${v.id} - Cliente: ${v.cliente} (${formatearFecha24hs(v.fecha)})</span>
                 <span style="color:#27ae60;">Total: $${v.total.toFixed(2)}</span>
               </div>
               <p style="font-size: 0.85rem; padding: 5px 10px; color: #555;"><b>Métodos de cobro:</b> ${metodos.join(' | ') || 'Efectivo'}</p>
@@ -1878,7 +1916,7 @@
             <tbody>
               ${data.egresos.map(e => `
                 <tr>
-                  <td>${new Date(e.fecha).toLocaleDateString()}</td>
+                  <td>${formatearFecha24hs(e.fecha)}</td>
                   <td><b>${e.categoria}</b></td>
                   <td>${e.concepto}</td>
                   <td>${e.metodo_pago}</td>                   <td style="color:#e74c3c; font-weight:bold;">-$${e.monto.toFixed(2)}</td>
@@ -1934,7 +1972,7 @@
       });
     });
 
-    // AUTO-REFRESCO DE LA PC COMPLETO (Sincroniza Ventas, Reportes, Devoluciones e Inventario cada 5 segundos)
+    // AUTO-REFRESCO DE LA PC COMPLETO (Cada 5 segundos)
     document.addEventListener('DOMContentLoaded', () => {
       setInterval(() => {
         if (typeof cargarHistorialVentas === 'function') cargarHistorialVentas();
