@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>BENEMEX POS Móvil</title>
-  
+
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2c3e50">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,6 +17,30 @@
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { background-color: #f4f6f9; color: #333; padding-bottom: 70px; user-select: none; }
+
+    /* PANTALLA DE BLOQUEO / SEGURIDAD */
+    .lock-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #1e293b;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .lock-card {
+      background: white;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 16px;
+      padding: 25px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .lock-icon { font-size: 3rem; margin-bottom: 10px; }
+    .lock-card h2 { font-size: 1.3rem; color: #2c3e50; margin-bottom: 6px; }
+    .lock-card p { font-size: 0.85rem; color: #64748b; margin-bottom: 18px; }
 
     header {
       background-color: #2c3e50;
@@ -319,6 +344,17 @@
 </head>
 <body>
 
+  <!-- PANTALLA DE BLOQUEO POR CONTRASEÑA -->
+  <div id="lock-screen" class="lock-overlay">
+    <div class="lock-card">
+      <div class="lock-icon">🔒</div>
+      <h2>Acceso Restringido</h2>
+      <p>Ingresa la contraseña de la empresa para habilitar la app:</p>
+      <input type="password" id="pass-input" class="input-field" placeholder="Contraseña..." onkeyup="if(event.key==='Enter') verificarPassword()">
+      <button class="btn-main-pay" style="margin-top: 15px;" onclick="verificarPassword()">Ingresar</button>
+    </div>
+  </div>
+
   <header>
     <div class="header-title">
       <span>📱 BENEMEX POS</span>
@@ -375,7 +411,7 @@
     </div>
   </main>
 
-  <!-- NAVEGACIÓN INFERIOR (SÓLO 2 PESTAÑAS) -->
+  <!-- NAVEGACIÓN INFERIOR -->
   <nav class="bottom-nav">
     <button class="nav-item active" onclick="cambiarTab('tab-ventas', this)">
       <span class="nav-icon">🛒</span>
@@ -429,6 +465,7 @@
   <script>
     const API = 'https://benemex-pos.onrender.com/api';
     const TELEFONO_WHATSAPP = '5493874642295';
+    const CONTRASEÑA_ACCESO = 'ricardo108';
     
     let productosCache = [];
     let comisionadosCache = [];
@@ -437,15 +474,37 @@
     let metodoPagoSeleccionado = 'Efectivo';
     let html5QrCode = null;
 
+    window.addEventListener('DOMContentLoaded', () => {
+      if (sessionStorage.getItem('benemex_app_auth') === 'true') {
+        desbloquearApp();
+      }
+    });
+    
+    if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+    function verificarPassword() {
+      const input = document.getElementById('pass-input').value;
+      if (input === CONTRASEÑA_ACCESO) {
+        sessionStorage.setItem('benemex_app_auth', 'true');
+        desbloquearApp();
+      } else {
+        showToast('❌ Contraseña incorrecta');
+        document.getElementById('pass-input').value = '';
+        document.getElementById('pass-input').focus();
+      }
+    }
+
+    function desbloquearApp() {
+      document.getElementById('lock-screen').style.display = 'none';
+      cargarDatosIniciales();
+    }
+
     function parseImg(url) {
       if (!url) return '';
       const match = url.match(/[-\w]{25,}/);
       return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
     }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      cargarDatosIniciales();
-    });
 
     async function cargarDatosIniciales() {
       try {
@@ -488,7 +547,6 @@
         return;
       }
 
-      // Si coincide exacto con un código de barras
       const matchCodigo = productosCache.find(p => p.codigo_barras && p.codigo_barras.toLowerCase() === q);
       if (matchCodigo) {
         agregarAlCarrito(matchCodigo);
@@ -498,7 +556,6 @@
         return;
       }
 
-      // Coincidencias por nombre o por código
       const filtrados = productosCache.filter(p => 
         (p.nombre && p.nombre.toLowerCase().includes(q)) || 
         (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))
@@ -740,7 +797,6 @@
       window.open(waUrl, '_blank');
     }
 
-    // ESCÁNER DE CÁMARA (APERTURA PREDETERMINADA CÁMARA TRASERA)
     async function toggleCamaraScanner() {
       const container = document.getElementById('scanner-container');
       if (container.style.display === 'block') {
@@ -750,7 +806,7 @@
         try {
           html5QrCode = new Html5Qrcode("reader");
           await html5QrCode.start(
-            { facingMode: "environment" }, // Abre directo la cámara trasera sin preguntar
+            { facingMode: "environment" },
             { fps: 10, qrbox: { width: 250, height: 250 } },
             onScanSuccess,
             onScanFailure
@@ -782,7 +838,6 @@
       document.getElementById('scanner-container').style.display = 'none';
     }
 
-    // HISTORIAL Y RESUMEN GENERAL A WHATSAPP
     async function cargarHistorialVentas() {
       const container = document.getElementById('historial-container');
       try {
