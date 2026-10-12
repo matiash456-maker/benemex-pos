@@ -1148,7 +1148,9 @@
       const r = await fetch(`${API}/productos`); productosMemoria = await r.json();
       
       const selectFiltroProd = document.getElementById('f-prod');
-      selectFiltroProd.innerHTML = '<option value="">Todos</option>' + productosMemoria.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+      if (selectFiltroProd) {
+        selectFiltroProd.innerHTML = '<option value="">Todos</option>' + productosMemoria.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+      }
 
       renderTablaInventario();
     }
@@ -1234,7 +1236,7 @@
       } 
     }
 
-    // HISTORIAL VENTAS DIRECTAS CON FILTROS DINÁMICOS
+    // HISTORIAL VENTAS DIRECTAS CON FILTROS DINÁMICOS Y RESALTADO DE DEVOLUCIONES
     async function cargarHistorialVentas() {
       const r = await fetch(`${API}/ventas`); 
       ventasMemoria = await r.json();
@@ -1271,15 +1273,23 @@
         return true;
       });
 
-      document.getElementById('historial-ventas').innerHTML = filtradas.map(x => `
-        <tr>
-          <td>#${x.id}</td>
-          <td><b style="color:#2980b9;">${x.codigo_pedido ? x.codigo_pedido : '-'}</b></td>
-          <td><b>${x.cliente_nombre}</b></td>
-          <td>${new Date(x.fecha).toLocaleString()}</td>
-          <td>$${x.total.toFixed(2)}</td>
-          <td><button class="btn btn-warning" onclick="verVenta(${x.id})">Ver Detalles / Modificar</button></td>
-        </tr>`).join('');
+      document.getElementById('historial-ventas').innerHTML = filtradas.map(x => {
+        const esDevuelta = Boolean(x.devuelta == 1 || x.estado === 'Devuelto' || x.estado === 'devuelto');
+        const estiloFila = esDevuelta ? 'style="background-color: #fff5f5;"' : '';
+        const totalTxt = esDevuelta 
+          ? `<span class="badge" style="background:#e74c3c;">DEVUELTA (-$${x.total.toFixed(2)})</span>` 
+          : `$${x.total.toFixed(2)}`;
+
+        return `
+          <tr ${estiloFila}>
+            <td>#${x.id}</td>
+            <td><b style="color:#2980b9;">${x.codigo_pedido ? x.codigo_pedido : '-'}</b></td>
+            <td><b>${x.cliente_nombre}</b></td>
+            <td>${new Date(x.fecha).toLocaleString()}</td>
+            <td>${totalTxt}</td>
+            <td><button class="btn btn-warning" onclick="verVenta(${x.id})">Ver Detalles / Modificar</button></td>
+          </tr>`;
+      }).join('');
     }
 
     function limpiarFiltrosVentas() {
@@ -1924,11 +1934,13 @@
       });
     });
 
-    // AUTO-REFRESCO DE LA PC (Consulta cada 5 segundos)
+    // AUTO-REFRESCO DE LA PC COMPLETO (Sincroniza Ventas, Reportes, Devoluciones e Inventario cada 5 segundos)
     document.addEventListener('DOMContentLoaded', () => {
       setInterval(() => {
         if (typeof cargarHistorialVentas === 'function') cargarHistorialVentas();
         if (typeof cargarReportes === 'function') cargarReportes();
+        if (typeof cargarDevoluciones === 'function') cargarDevoluciones();
+        if (typeof cargarInventario === 'function') cargarInventario();
       }, 5000);
     });
 
