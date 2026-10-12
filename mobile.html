@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BENEMEX POS">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60'>📱</text></svg>">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22POS%20BENEMEX%20M%C3%B3vil%22%2C%22short_name%22%3A%22BENEMEX%22%2C%22start_url%22%3A%22%2Fmobile.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%232c3e50%22%2C%22theme_color%22%3A%22%232c3e50%22%7D">
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22POS%20BENEMEX%20M%C3%B3vil%22%2C%22short_name%22%3A%22BENEMEX%22%2C%22start_url%22%3A%22%2Fmobile.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%232c3e50%22%2C%22theme_color%22%3A%22%232c3e50%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%232c3e50'%2F%3E%3Ctext%20x%3D'50%25'%20y%3D'55%25'%20dominant-baseline%3D'middle'%20text-anchor%3D'middle'%20font-size%3D'60'%3E%F0%9F%93%B1%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 
   <!-- Librería para lectura de Código de Barras con la cámara -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -69,7 +69,10 @@
 
   <header>
     <h1>📱 POS BENEMEX Móvil</h1>
-    <span id="clock-24">00:00:00</span>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button id="btn-instalar-pwa" style="display:none; background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; font-weight:bold; font-size:0.8rem; cursor:pointer;" onclick="instalarPWA()">📥 Instalar App</button>
+      <span id="clock-24">00:00:00</span>
+    </div>
   </header>
 
   <!-- PESTAÑA 1: COBRO Y VENTAS -->
@@ -114,7 +117,7 @@
           </select>
         </div>
 
-        <!-- ADJUNTO DE COMPROBANTE EXCLUSIVO PARA TRANSFERENCIA -->
+        <!-- ADJUNTO DE COMPROBANTE PARA TRANSFERENCIA, TARJETA Y QR -->
         <div class="form-group" id="m-group-comprobante-v" style="display:none; background:#eaf2f8; padding:10px; border-radius:6px; border:1px solid #2980b9;">
           <label style="color:#2980b9;">📸 Adjuntar Foto del Comprobante de Pago:</label>
           <input type="file" id="m-v-comprobante-foto" accept="image/*" capture="environment" onchange="previsualizarComprobanteVenta(this)">
@@ -213,6 +216,40 @@
   </nav>
 
   <script>
+    // REGISTRO Y EVENTO DE INSTALACIÓN PWA
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('btn-instalar-pwa');
+      if (btn) btn.style.display = 'inline-block';
+    });
+
+    function instalarPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            const btn = document.getElementById('btn-instalar-pwa');
+            if (btn) btn.style.display = 'none';
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {
+          try {
+            const swCode = "self.addEventListener('fetch', function(e) { e.respondWith(fetch(e.request)); });";
+            const blob = new Blob([swCode], { type: 'text/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+          } catch(e) {}
+        });
+      });
+    }
+
     const API = window.location.origin.startsWith('http') ? `${window.location.origin}/api` : 'https://benemex-pos.onrender.com/api';
     
     let carritoMovil = [];
@@ -228,7 +265,6 @@
     let fotoVentaComprobanteNombre = '';
     let fotoVentaComprobanteFile = null;
 
-    // CONVERSIÓN DE BASE64 A ARCHIVO (UTILIZADO PARA RESTAURAR TRAS REINICIO DE CÁMARA)
     function dataURLtoFile(dataurl, filename) {
       try {
         let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
@@ -242,7 +278,6 @@
       }
     }
 
-    // GUARDAR Y RESTAURAR ESTADO DEL CARRITO EN LOCALSTORAGE
     function guardarEstadoCarrito() {
       try {
         localStorage.setItem('benemex_carrito', JSON.stringify(carritoMovil));
@@ -320,10 +355,11 @@
       if (btn) btn.classList.add('active');
     }
 
+    // ACTIVACIÓN DE COMPROBANTE PARA TRANSFERENCIA, TARJETA Y QR
     function toggleCampoComprobanteVenta() {
       const metodo = document.getElementById('m-metodo-pago').value;
       const box = document.getElementById('m-group-comprobante-v');
-      if (metodo === 'transferencia') {
+      if (metodo === 'transferencia' || metodo === 'tarjeta' || metodo === 'qr') {
         box.style.display = 'block';
       } else {
         box.style.display = 'none';
@@ -567,8 +603,8 @@
       }
 
       const metodo = document.getElementById('m-metodo-pago').value;
-      if (metodo === 'transferencia' && !fotoVentaComprobanteFile) {
-        if (!confirm('No adjuntaste foto del comprobante de transferencia. ¿Deseas continuar de todas formas?')) {
+      if ((metodo === 'transferencia' || metodo === 'tarjeta' || metodo === 'qr') && !fotoVentaComprobanteFile) {
+        if (!confirm(`No adjuntaste foto del comprobante de ${metodo.toUpperCase()}. ¿Deseas continuar de todas formas?`)) {
           return;
         }
       }
@@ -898,14 +934,14 @@
     }
 
     async function compartirWhatsApp(texto, archivo = null) {
-      if (archivo && navigator.share && navigator.canShare) {
+      if (archivo && navigator.share) {
         try {
           let fileToShare = archivo;
           if (!(archivo instanceof File)) {
             fileToShare = new File([archivo], archivo.name || 'comprobante.jpg', { type: archivo.type || 'image/jpeg' });
           }
 
-          if (navigator.canShare({ files: [fileToShare] })) {
+          if (navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
             await navigator.share({
               text: texto,
               files: [fileToShare]
@@ -920,7 +956,6 @@
       window.open(url, '_blank');
     }
 
-    // INICIALIZACIÓN Y RESTAURACIÓN AUTOMÁTICA
     window.addEventListener('DOMContentLoaded', () => {
       restaurarEstadoCarrito();
       cargarComisionadosMovil();
