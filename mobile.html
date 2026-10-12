@@ -97,31 +97,24 @@
       <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
         <div class="form-group">
           <label>Cliente (Opcional):</label>
-          <input type="text" id="m-cliente" placeholder="Nombre del cliente" oninput="guardarEstadoCarrito()">
+          <input type="text" id="m-cliente" placeholder="Nombre del cliente">
         </div>
 
         <div class="form-group">
           <label>Vendedor / Comisionado:</label>
-          <select id="m-comisionado" onchange="guardarEstadoCarrito()">
+          <select id="m-comisionado">
             <option value="">Venta del Local (Sin comisión)</option>
           </select>
         </div>
 
         <div class="form-group">
           <label>Método de Pago:</label>
-          <select id="m-metodo-pago" onchange="toggleCampoComprobanteVenta(); guardarEstadoCarrito();">
+          <select id="m-metodo-pago">
             <option value="efectivo">💵 Efectivo</option>
             <option value="transferencia">🏦 Transferencia</option>
             <option value="tarjeta">💳 Tarjeta</option>
             <option value="qr">📱 QR</option>
           </select>
-        </div>
-
-        <!-- ADJUNTO DE COMPROBANTE PARA TRANSFERENCIA, TARJETA Y QR -->
-        <div class="form-group" id="m-group-comprobante-v" style="display:none; background:#eaf2f8; padding:10px; border-radius:6px; border:1px solid #2980b9;">
-          <label style="color:#2980b9;">📸 Adjuntar Foto del Comprobante de Pago:</label>
-          <input type="file" id="m-v-comprobante-foto" accept="image/*" capture="environment" onchange="previsualizarComprobanteVenta(this)">
-          <div id="m-v-comprobante-preview" style="margin-top:6px; text-align:center;"></div>
         </div>
 
         <div class="form-group">
@@ -165,6 +158,23 @@
       <h2 style="margin-bottom:10px; text-align:center;">Apunta al Código de Barras</h2>
       <div id="reader"></div>
       <button class="btn btn-danger" style="margin-top:15px;" onclick="cerrarEscanerCamara()">Cerrar Cámara</button>
+    </div>
+  </div>
+
+  <!-- MODAL POST-VENTA (COMPROBANTE Y WHATSAPP) -->
+  <div id="modal-post-venta" class="modal">
+    <div class="modal-content" style="text-align:center;">
+      <h2 style="color:#27ae60; margin-bottom:10px;">✅ ¡Venta Registrada!</h2>
+      <p id="post-venta-resumen" style="font-size:0.95rem; color:#333; margin-bottom:15px; font-weight:bold;"></p>
+      
+      <!-- Input de archivo oculto activado por toque directo -->
+      <input type="file" id="input-foto-post" accept="image/*" capture="environment" style="display:none;" onchange="procesarFotoYEnviarWhatsApp(this)">
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="btn btn-whatsapp" onclick="tomarFotoComprobante()">📸 Tomar Comprobante y Enviar a WhatsApp</button>
+        <button class="btn btn-primary" onclick="enviarSoloTextoWhatsApp()">💬 Enviar solo Texto por WhatsApp</button>
+        <button class="btn btn-warning" onclick="cerrarModalPostVenta()">✖️ Finalizar sin Enviar</button>
+      </div>
     </div>
   </div>
 
@@ -216,7 +226,7 @@
   </nav>
 
   <script>
-    // REGISTRO Y EVENTO DE INSTALACIÓN PWA
+    // CONFIGURACIÓN PWA SECURIZADA Y NO INVASIVA
     let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -240,13 +250,11 @@
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {
-          try {
-            const swCode = "self.addEventListener('fetch', function(e) { e.respondWith(fetch(e.request)); });";
-            const blob = new Blob([swCode], { type: 'text/javascript' });
-            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
-          } catch(e) {}
-        });
+        try {
+          const swCode = "self.addEventListener('fetch', function(e) { e.respondWith(fetch(e.request)); });";
+          const blob = new Blob([swCode], { type: 'text/javascript' });
+          navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+        } catch(e) {}
       });
     }
 
@@ -261,75 +269,7 @@
     
     let fotoDevolucionNombre = '';
     let fotoDevolucionFile = null;
-
-    let fotoVentaComprobanteNombre = '';
-    let fotoVentaComprobanteFile = null;
-
-    function dataURLtoFile(dataurl, filename) {
-      try {
-        let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
-            bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
-        while(n--){
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        return new File([u8arr], filename, {type:mime});
-      } catch(e) {
-        return null;
-      }
-    }
-
-    function guardarEstadoCarrito() {
-      try {
-        localStorage.setItem('benemex_carrito', JSON.stringify(carritoMovil));
-        localStorage.setItem('benemex_cliente', document.getElementById('m-cliente')?.value || '');
-        localStorage.setItem('benemex_metodo', document.getElementById('m-metodo-pago')?.value || 'efectivo');
-        localStorage.setItem('benemex_comisionado', document.getElementById('m-comisionado')?.value || '');
-        localStorage.setItem('benemex_recargo', document.getElementById('m-recargo')?.value || '0');
-      } catch(e) {}
-    }
-
-    function restaurarEstadoCarrito() {
-      try {
-        const car = localStorage.getItem('benemex_carrito');
-        if (car) carritoMovil = JSON.parse(car) || [];
-        
-        const cli = localStorage.getItem('benemex_cliente');
-        if (cli && document.getElementById('m-cliente')) document.getElementById('m-cliente').value = cli;
-
-        const met = localStorage.getItem('benemex_metodo');
-        if (met && document.getElementById('m-metodo-pago')) {
-          document.getElementById('m-metodo-pago').value = met;
-          toggleCampoComprobanteVenta();
-        }
-
-        const com = localStorage.getItem('benemex_comisionado');
-        if (com && document.getElementById('m-comisionado')) document.getElementById('m-comisionado').value = com;
-
-        const rec = localStorage.getItem('benemex_recargo');
-        if (rec && document.getElementById('m-recargo')) document.getElementById('m-recargo').value = rec;
-
-        const imgB64 = localStorage.getItem('benemex_comprobante_b64');
-        const imgName = localStorage.getItem('benemex_comprobante_nombre');
-        if (imgB64 && imgName) {
-          fotoVentaComprobanteFile = dataURLtoFile(imgB64, imgName);
-          fotoVentaComprobanteNombre = imgName;
-          const prev = document.getElementById('m-v-comprobante-preview');
-          if (prev) prev.innerHTML = `<img src="${imgB64}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #2980b9;">`;
-        }
-      } catch(e) {}
-    }
-
-    function limpiarEstadoCarritoGuardado() {
-      try {
-        localStorage.removeItem('benemex_carrito');
-        localStorage.removeItem('benemex_cliente');
-        localStorage.removeItem('benemex_metodo');
-        localStorage.removeItem('benemex_comisionado');
-        localStorage.removeItem('benemex_recargo');
-        localStorage.removeItem('benemex_comprobante_b64');
-        localStorage.removeItem('benemex_comprobante_nombre');
-      } catch(e) {}
-    }
+    let textoVentaParaCompartir = '';
 
     function formatearFecha24hs(fechaStr) {
       if (!fechaStr) return '-';
@@ -355,51 +295,6 @@
       if (btn) btn.classList.add('active');
     }
 
-    // ACTIVACIÓN DE COMPROBANTE PARA TRANSFERENCIA, TARJETA Y QR
-    function toggleCampoComprobanteVenta() {
-      const metodo = document.getElementById('m-metodo-pago').value;
-      const box = document.getElementById('m-group-comprobante-v');
-      if (metodo === 'transferencia' || metodo === 'tarjeta' || metodo === 'qr') {
-        box.style.display = 'block';
-      } else {
-        box.style.display = 'none';
-        document.getElementById('m-v-comprobante-foto').value = '';
-        document.getElementById('m-v-comprobante-preview').innerHTML = '';
-        fotoVentaComprobanteNombre = '';
-        fotoVentaComprobanteFile = null;
-        try {
-          localStorage.removeItem('benemex_comprobante_b64');
-          localStorage.removeItem('benemex_comprobante_nombre');
-        } catch(e) {}
-      }
-    }
-
-    function previsualizarComprobanteVenta(input) {
-      const prev = document.getElementById('m-v-comprobante-preview');
-      if (input.files && input.files[0]) {
-        fotoVentaComprobanteFile = input.files[0];
-        fotoVentaComprobanteNombre = input.files[0].name;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const b64 = e.target.result;
-          prev.innerHTML = `<img src="${b64}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #2980b9;">`;
-          try {
-            localStorage.setItem('benemex_comprobante_b64', b64);
-            localStorage.setItem('benemex_comprobante_nombre', fotoVentaComprobanteNombre);
-          } catch(err) {}
-        }
-        reader.readAsDataURL(input.files[0]);
-      } else {
-        prev.innerHTML = '';
-        fotoVentaComprobanteNombre = '';
-        fotoVentaComprobanteFile = null;
-        try {
-          localStorage.removeItem('benemex_comprobante_b64');
-          localStorage.removeItem('benemex_comprobante_nombre');
-        } catch(e) {}
-      }
-    }
-
     async function cargarComisionadosMovil() {
       try {
         const r = await fetch(`${API}/comisionados`);
@@ -409,9 +304,6 @@
         if (sel) {
           sel.innerHTML = '<option value="">Venta del Local (Sin comisión)</option>' +
             coms.map(c => `<option value="${c.id}">${c.nombre} (${c.porcentaje}%)</option>`).join('');
-          
-          const savedCom = localStorage.getItem('benemex_comisionado');
-          if (savedCom) sel.value = savedCom;
         }
       } catch (e) {
         console.error("Error al cargar comisionados en móvil:", e);
@@ -543,7 +435,6 @@
 
     function renderCarritoMovil() {
       const cont = document.getElementById('m-carrito-lista');
-      guardarEstadoCarrito();
 
       if (carritoMovil.length === 0) {
         cont.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">El carrito está vacío</p>';
@@ -602,19 +493,13 @@
         }
       }
 
-      const metodo = document.getElementById('m-metodo-pago').value;
-      if ((metodo === 'transferencia' || metodo === 'tarjeta' || metodo === 'qr') && !fotoVentaComprobanteFile) {
-        if (!confirm(`No adjuntaste foto del comprobante de ${metodo.toUpperCase()}. ¿Deseas continuar de todas formas?`)) {
-          return;
-        }
-      }
-
       const btn = document.getElementById('m-btn-cobrar');
       btn.disabled = true;
 
       const cliente = document.getElementById('m-cliente').value.trim() || 'Venta Móvil Mostrador';
       const comisionadoVal = document.getElementById('m-comisionado').value;
       const comisionadoId = comisionadoVal ? parseInt(comisionadoVal) : null;
+      const metodo = document.getElementById('m-metodo-pago').value;
       
       const subtotal = carritoMovil.reduce((acc, i) => acc + (i.precio * i.cant), 0);
       const recargoPorc = parseFloat(document.getElementById('m-recargo').value) || 0;
@@ -647,11 +532,10 @@
         
         if (res.ok) {
           const data = await res.json();
-          alert('¡Venta realizada y registrada con éxito!');
-          
           let recargoTxt = recargoPorc > 0 ? `\nRecargo (${recargoPorc}%): +$${montoRecargo.toFixed(2)}` : '';
 
-          const textoMsg = `🛒 *COMPROBANTE DE VENTA BENEMEX*\n\n` +
+          // Construcción del texto descriptivo completo
+          textoVentaParaCompartir = `🛒 *COMPROBANTE DE VENTA BENEMEX*\n\n` +
             `Venta #${data.venta_id || ''}\n` +
             `Cliente: ${cliente}\n` +
             `Fecha: ${formatearFecha24hs(new Date())}\n` +
@@ -660,19 +544,17 @@
             `\nSubtotal: $${subtotal.toFixed(2)}${recargoTxt}` +
             `\n\n*TOTAL: $${totalFinal.toFixed(2)}*`;
 
-          const fotoParaCompartir = fotoVentaComprobanteFile;
-
-          if (confirm('¿Deseas enviar el comprobante de esta venta por WhatsApp?')) {
-            await compartirWhatsApp(textoMsg, fotoParaCompartir);
-          }
-
+          // Limpieza de formulario y carrito tras guardar en BD
           carritoMovil = [];
-          limpiarEstadoCarritoGuardado();
           document.getElementById('m-cliente').value = '';
           document.getElementById('m-recargo').value = '0';
           document.getElementById('m-metodo-pago').value = 'efectivo';
-          toggleCampoComprobanteVenta();
           renderCarritoMovil();
+
+          // Abrir modal de confirmación y opciones de envío
+          document.getElementById('post-venta-resumen').innerText = `Venta #${data.venta_id || ''} - Total: $${totalFinal.toFixed(2)}`;
+          document.getElementById('modal-post-venta').style.display = 'flex';
+
         } else {
           const errData = await res.json().catch(() => ({}));
           alert('Error al procesar la venta: ' + (errData.error || res.statusText));
@@ -682,6 +564,31 @@
       } finally {
         btn.disabled = false;
       }
+    }
+
+    // NÚCLEO DE FOTO Y ENVÍO POST-VENTA
+    function tomarFotoComprobante() {
+      const input = document.getElementById('input-foto-post');
+      input.value = '';
+      input.click();
+    }
+
+    async function procesarFotoYEnviarWhatsApp(input) {
+      if (input.files && input.files[0]) {
+        const foto = input.files[0];
+        await compartirWhatsApp(textoVentaParaCompartir, foto);
+        cerrarModalPostVenta();
+      }
+    }
+
+    async function enviarSoloTextoWhatsApp() {
+      await compartirWhatsApp(textoVentaParaCompartir, null);
+      cerrarModalPostVenta();
+    }
+
+    function cerrarModalPostVenta() {
+      document.getElementById('modal-post-venta').style.display = 'none';
+      textoVentaParaCompartir = '';
     }
 
     async function cargarVentasMovil() {
@@ -957,7 +864,6 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      restaurarEstadoCarrito();
       cargarComisionadosMovil();
       renderCarritoMovil();
     });
