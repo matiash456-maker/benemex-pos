@@ -286,8 +286,12 @@
     let ultimosProductosBuscados = [];
     let ventaSeleccionadaDev = null;
     let html5QrcodeScanner = null;
+    
     let fotoDevolucionNombre = '';
+    let fotoDevolucionFile = null;
+
     let fotoVentaComprobanteNombre = '';
+    let fotoVentaComprobanteFile = null;
 
     // FORMATO HORA EN 24 HORAS
     function formatearFecha24hs(fechaStr) {
@@ -320,12 +324,14 @@
         document.getElementById('m-v-comprobante-foto').value = '';
         document.getElementById('m-v-comprobante-preview').innerHTML = '';
         fotoVentaComprobanteNombre = '';
+        fotoVentaComprobanteFile = null;
       }
     }
 
     function previsualizarComprobanteVenta(input) {
       const prev = document.getElementById('m-v-comprobante-preview');
       if (input.files && input.files[0]) {
+        fotoVentaComprobanteFile = input.files[0];
         fotoVentaComprobanteNombre = input.files[0].name;
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -335,6 +341,7 @@
       } else {
         prev.innerHTML = '';
         fotoVentaComprobanteNombre = '';
+        fotoVentaComprobanteFile = null;
       }
     }
 
@@ -524,7 +531,7 @@
       }
 
       const metodo = document.getElementById('m-metodo-pago').value;
-      if (metodo === 'transferencia' && !fotoVentaComprobanteNombre) {
+      if (metodo === 'transferencia' && !fotoVentaComprobanteFile) {
         if (!confirm('No adjuntaste foto del comprobante de transferencia. ¿Deseas continuar de todas formas?')) {
           return;
         }
@@ -571,19 +578,20 @@
           alert('¡Venta realizada y registrada con éxito!');
           
           let recargoTxt = recargoPorc > 0 ? `\nRecargo (${recargoPorc}%): +$${montoRecargo.toFixed(2)}` : '';
-          let comprobanteTxt = (metodo === 'transferencia' && fotoVentaComprobanteNombre) ? `\n📸 Comprobante: ${fotoVentaComprobanteNombre}` : '';
 
           const textoMsg = `🛒 *COMPROBANTE DE VENTA BENEMEX*\n\n` +
             `Venta #${data.venta_id || ''}\n` +
             `Cliente: ${cliente}\n` +
             `Fecha: ${formatearFecha24hs(new Date())}\n` +
-            `Medio de Pago: ${metodo.toUpperCase()}${comprobanteTxt}\n\n` +
+            `Medio de Pago: ${metodo.toUpperCase()}\n\n` +
             `*Detalle:*\n` + carritoMovil.map(i => `- ${i.cant}x ${i.nombre} ($${i.precio.toFixed(2)})`).join('\n') +
             `\nSubtotal: $${subtotal.toFixed(2)}${recargoTxt}` +
             `\n\n*TOTAL: $${totalFinal.toFixed(2)}*`;
 
+          const fotoParaCompartir = fotoVentaComprobanteFile;
+
           if (confirm('¿Deseas enviar el comprobante de esta venta por WhatsApp?')) {
-            compartirWhatsApp(textoMsg);
+            await compartirWhatsApp(textoMsg, fotoParaCompartir);
           }
 
           carritoMovil = [];
@@ -676,6 +684,7 @@
         document.getElementById('m-dev-foto').value = '';
         document.getElementById('m-dev-foto-preview').innerHTML = '';
         fotoDevolucionNombre = '';
+        fotoDevolucionFile = null;
 
         document.getElementById('modal-devolucion').style.display = 'flex';
       } catch (e) {
@@ -686,6 +695,7 @@
     function previsualizarFotoDevolucion(input) {
       const prev = document.getElementById('m-dev-foto-preview');
       if (input.files && input.files[0]) {
+        fotoDevolucionFile = input.files[0];
         fotoDevolucionNombre = input.files[0].name;
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -695,6 +705,7 @@
       } else {
         prev.innerHTML = '';
         fotoDevolucionNombre = '';
+        fotoDevolucionFile = null;
       }
     }
 
@@ -744,8 +755,10 @@
             `Medio de Reembolso: ${metodo.toUpperCase()}\n` +
             `Motivo: ${motivo}`;
 
+          const fotoDevParaCompartir = fotoDevolucionFile;
+
           if (confirm('¿Deseas enviar el aviso de devolución por WhatsApp?')) {
-            compartirWhatsApp(textoDev);
+            await compartirWhatsApp(textoDev, fotoDevParaCompartir);
           }
 
           cerrarModalDevolucion();
@@ -820,34 +833,4 @@
         if (devsHoy.length === 0) {
           reporteTexto += `_Sin devoluciones registradas hoy_\n`;
         } else {
-          devsHoy.forEach(d => {
-            const montoDev = d.total_monto || 0;
-            totalDevsMonto += montoDev;
-            reporteTexto += `\n- *${d.origen}*\n`;
-            reporteTexto += `  • Detalle: ${d.detalles}\n`;
-            reporteTexto += `  • Reembolso: ${d.detalle_pago}\n`;
-            reporteTexto += `  • Monto Devuelto: *-$${montoDev.toFixed(2)}*\n`;
-          });
-        }
-
-        const balanceNeto = totalVentasMonto - totalDevsMonto;
-        reporteTexto += `\n==============================\n`;
-        reporteTexto += `💰 *RESUMEN Y BALANCE DIARIO:*\n`;
-        reporteTexto += `• Total Ventas Activas: $${totalVentasMonto.toFixed(2)}\n`;
-        reporteTexto += `• Total Devoluciones: -$${totalDevsMonto.toFixed(2)}\n`;
-        reporteTexto += `• *BALANCE NETO DIARIO: $${balanceNeto.toFixed(2)}*\n`;
-
-        compartirWhatsApp(reporteTexto);
-      } catch (err) {
-        alert("Error al compilar el historial diario: " + err.message);
-      }
-    }
-
-    // UTILIDAD DE ENVÍO A WHATSAPP
-    function compartirWhatsApp(texto) {
-      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-      window.open(url, '_blank');
-    }
-  </script>
-</body>
-</html>
+          devs
