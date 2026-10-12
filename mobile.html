@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BENEMEX POS">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60'>📱</text></svg>">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22POS%20BENEMEX%20M%C3%B3vil%22%2C%22short_name%22%3A%22BENEMEX%22%2C%22start_url%22%3A%22%2Fmobile.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%232c3e50%22%2C%22theme_color%22%3A%22%232c3e50%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%232c3e50'%2F%3E%3Ctext%20x%3D'50%25'%20y%3D'55%25'%20dominant-baseline%3D'middle'%20text-anchor%3D'middle'%20font-size%3D'60'%3E%F0%9F%93%B1%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+  <link rel="manifest" id="pwa-manifest-link" href="manifest.json">
 
   <!-- Librería para lectura de Código de Barras con la cámara -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -69,7 +69,10 @@
 
   <header>
     <h1>📱 POS BENEMEX Móvil</h1>
-    <span id="clock-24">00:00:00</span>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button id="btn-instalar-pwa" style="display:none; background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; font-weight:bold; font-size:0.8rem; cursor:pointer;" onclick="instalarPWA()">📥 Instalar App</button>
+      <span id="clock-24">00:00:00</span>
+    </div>
   </header>
 
   <!-- PESTAÑA 1: COBRO Y VENTAS -->
@@ -161,4 +164,690 @@
     <div class="modal-content">
       <h2 style="margin-bottom:10px; text-align:center;">Apunta al Código de Barras</h2>
       <div id="reader"></div>
-      <button class="btn btn-danger" style="
+      <button class="btn btn-danger" style="margin-top:15px;" onclick="cerrarEscanerCamara()">Cerrar Cámara</button>
+    </div>
+  </div>
+
+  <!-- MODAL DE PROCESAMIENTO DE DEVOLUCIÓN -->
+  <div id="modal-devolucion" class="modal">
+    <div class="modal-content">
+      <h2 style="margin-bottom:10px; color:#c0392b;">Procesar Devolución</h2>
+      <p id="m-dev-info-venta" style="font-size:0.85rem; color:#555; margin-bottom:10px; font-weight:bold;"></p>
+      
+      <div id="m-dev-items-lista" style="margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0;"></div>
+
+      <div class="form-group">
+        <label>Medio de Reembolso:</label>
+        <select id="m-dev-metodo">
+          <option value="efectivo">1. Efectivo</option>
+          <option value="transferencia">2. Transferencia</option>
+          <option value="tarjeta">3. Tarjeta</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Motivo de la Devolución:</label>
+        <input type="text" id="m-dev-motivo" placeholder="Ej: Producto fallado, cambio de opinión...">
+      </div>
+
+      <div class="form-group">
+        <label>Adjuntar Foto de Comprobante / Producto (Opcional):</label>
+        <input type="file" id="m-dev-foto" accept="image/*" capture="environment" onchange="previsualizarFotoDevolucion(this)">
+        <div id="m-dev-foto-preview" style="margin-top:8px; text-align:center;"></div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">
+        <button class="btn btn-danger" id="m-btn-confirmar-dev" onclick="confirmarDevolucionMovil()">Confirmar y Registrar Devolución</button>
+        <button class="btn btn-warning" onclick="cerrarModalDevolucion()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVEGACIÓN INFERIOR -->
+  <nav class="nav-bottom">
+    <button class="nav-btn active" onclick="cambiarSeccion('sec-ventas', this)">
+      <span>🛒</span>
+      Ventas
+    </button>
+    <button class="nav-btn" onclick="cambiarSeccion('sec-devoluciones', this); cargarVentasMovil();">
+      <span>🔄</span>
+      Devoluciones
+    </button>
+  </nav>
+
+  <script>
+    // REGISTRO Y SOPORTE PWA INSTALABLE
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('btn-instalar-pwa');
+      if (btn) btn.style.display = 'inline-block';
+    });
+
+    function instalarPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            document.getElementById('btn-instalar-pwa').style.display = 'none';
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          self.addEventListener('install', (e) => self.skipWaiting());
+          self.addEventListener('activate', (e) => self.clients.claim());
+          self.addEventListener('fetch', (e) => {
+            e.respondWith(fetch(e.request).catch(() => new Response('Offline')));
+          });
+        `;
+        try {
+          const blob = new Blob([swCode], { type: 'application/javascript' });
+          const swUrl = URL.createObjectURL(blob);
+          navigator.serviceWorker.register(swUrl).catch(() => {
+            navigator.serviceWorker.register('/sw.js').catch(()=>{});
+          });
+        } catch(e) {
+          navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        }
+      });
+    }
+
+    // MANIFEST BLOB POR SI NO EXISTE ARCHIVO FISICO MANIFEST.JSON EN EL SERVIDOR
+    try {
+      const manifestObj = {
+        name: "POS BENEMEX Móvil",
+        short_name: "BENEMEX",
+        start_url: "/mobile.html",
+        display: "standalone",
+        background_color: "#2c3e50",
+        theme_color: "#2c3e50",
+        icons: [{
+          src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60'>📱</text></svg>",
+          sizes: "192x192 512x512",
+          type: "image/svg+xml"
+        }]
+      };
+      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+      const manifestUrl = URL.createObjectURL(manifestBlob);
+      document.getElementById('pwa-manifest-link').href = manifestUrl;
+    } catch(e) {}
+
+    // DETECCIÓN DINÁMICA DE LA DIRECCIÓN DEL SERVIDOR
+    const API = window.location.origin.startsWith('http') ? `${window.location.origin}/api` : 'https://benemex-pos.onrender.com/api';
+    
+    let carritoMovil = [];
+    let ventasCargadas = [];
+    let ultimosProductosBuscados = [];
+    let ventaSeleccionadaDev = null;
+    let html5QrcodeScanner = null;
+    let fotoDevolucionNombre = '';
+    let fotoVentaComprobanteNombre = '';
+
+    // FORMATO HORA EN 24 HORAS
+    function formatearFecha24hs(fechaStr) {
+      if (!fechaStr) return '-';
+      const d = new Date(fechaStr);
+      if (isNaN(d.getTime())) return fechaStr;
+      return d.toLocaleString('es-AR', { hour12: false });
+    }
+
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('clock-24').innerText = now.toLocaleTimeString('es-AR', { hour12: false });
+    }, 1000);
+
+    function cambiarSeccion(secId, btn) {
+      document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(secId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // TOGGLE COMPROBANTE DE VENTA SEGÚN MÉTODO DE PAGO
+    function toggleCampoComprobanteVenta() {
+      const metodo = document.getElementById('m-metodo-pago').value;
+      const box = document.getElementById('m-group-comprobante-v');
+      if (metodo === 'transferencia') {
+        box.style.display = 'block';
+      } else {
+        box.style.display = 'none';
+        document.getElementById('m-v-comprobante-foto').value = '';
+        document.getElementById('m-v-comprobante-preview').innerHTML = '';
+        fotoVentaComprobanteNombre = '';
+      }
+    }
+
+    function previsualizarComprobanteVenta(input) {
+      const prev = document.getElementById('m-v-comprobante-preview');
+      if (input.files && input.files[0]) {
+        fotoVentaComprobanteNombre = input.files[0].name;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          prev.innerHTML = `<img src="${e.target.result}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #2980b9;">`;
+        }
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        prev.innerHTML = '';
+        fotoVentaComprobanteNombre = '';
+      }
+    }
+
+    // CARGAR COMISIONADOS PARA SELECCIÓN MÓVIL
+    async function cargarComisionadosMovil() {
+      try {
+        const r = await fetch(`${API}/comisionados`);
+        if (!r.ok) return;
+        const coms = await r.json();
+        const sel = document.getElementById('m-comisionado');
+        sel.innerHTML = '<option value="">Venta del Local (Sin comisión)</option>' +
+          coms.map(c => `<option value="${c.id}">${c.nombre} (${c.porcentaje}%)</option>`).join('');
+      } catch (e) {
+        console.error("Error al cargar comisionados en móvil:", e);
+      }
+    }
+    cargarComisionadosMovil();
+
+    // ESCÁNER DE CÓDIGO DE BARRAS POR CÁMARA TRASERA
+    function abrirEscanerCamara() {
+      document.getElementById('modal-escaner').style.display = 'flex';
+      
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5Qrcode("reader");
+      }
+
+      const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+      
+      html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        config,
+        async (decodedText) => {
+          cerrarEscanerCamara();
+          await buscarYAgregarPorCodigo(decodedText);
+        },
+        (errorMessage) => {}
+      ).catch(err => {
+        alert("No se pudo acceder a la cámara trasera: " + err);
+        cerrarEscanerCamara();
+      });
+    }
+
+    function cerrarEscanerCamara() {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+          document.getElementById('modal-escaner').style.display = 'none';
+        }).catch(() => {
+          document.getElementById('modal-escaner').style.display = 'none';
+        });
+      } else {
+        document.getElementById('modal-escaner').style.display = 'none';
+      }
+    }
+
+    async function buscarYAgregarPorCodigo(codigo) {
+      try {
+        const r = await fetch(`${API}/productos/buscar?q=${encodeURIComponent(codigo)}`);
+        const data = await r.json();
+        if (data.length > 0) {
+          const p = data.find(prod => prod.codigo_barras === codigo) || data[0];
+          agregarAlCarritoMovil(p.id, p.nombre, p.precio, p.costo || 0, p.stock);
+        } else {
+          alert(`No se encontró ningún producto con el código: ${codigo}`);
+        }
+      } catch (e) {
+        alert("Error al buscar producto por código.");
+      }
+    }
+
+    // BUSCADOR Y CARRITO MÓVIL
+    async function buscarProductos(q) {
+      const box = document.getElementById('m-sug-prod');
+      if (q.length < 2) { box.style.display = 'none'; return; }
+      try {
+        const r = await fetch(`${API}/productos/buscar?q=${encodeURIComponent(q)}`);
+        ultimosProductosBuscados = await r.json();
+        if (ultimosProductosBuscados.length === 0) { box.style.display = 'none'; return; }
+        
+        box.innerHTML = ultimosProductosBuscados.map(p => `
+          <div class="sug-item" onclick="seleccionarSugerenciaPorId(${p.id})">
+            <b>${p.codigo_barras || ''}</b> - ${p.nombre} ($${p.precio}) <small>[Costo: $${(p.costo||0).toFixed(2)} | Stock: ${p.stock}]</small>
+          </div>
+        `).join('');
+        box.style.display = 'block';
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function seleccionarSugerenciaPorId(id) {
+      const p = ultimosProductosBuscados.find(prod => prod.id === id);
+      if (p) {
+        agregarAlCarritoMovil(p.id, p.nombre, p.precio, p.costo || 0, p.stock);
+      }
+    }
+
+    function agregarAlCarritoMovil(id, nombre, precio, costo, stock) {
+      const exist = carritoMovil.find(i => i.id === id);
+      if (exist) {
+        exist.cant++;
+      } else {
+        carritoMovil.push({ 
+          id: parseInt(id), 
+          nombre: nombre, 
+          precio: parseFloat(precio)||0, 
+          costo: parseFloat(costo)||0, 
+          stock: parseInt(stock)||0, 
+          cant: 1 
+        });
+      }
+      document.getElementById('m-buscar-prod').value = '';
+      document.getElementById('m-sug-prod').style.display = 'none';
+      renderCarritoMovil();
+    }
+
+    function cambiarPrecioMovil(idx, val) {
+      let nuevoPrecio = parseFloat(val);
+      if (isNaN(nuevoPrecio)) nuevoPrecio = carritoMovil[idx].costo;
+
+      if (nuevoPrecio < carritoMovil[idx].costo) {
+        alert(`El precio ($${nuevoPrecio.toFixed(2)}) no puede ser menor al costo del producto ($${carritoMovil[idx].costo.toFixed(2)}).`);
+        nuevoPrecio = carritoMovil[idx].costo;
+      }
+
+      carritoMovil[idx].precio = nuevoPrecio;
+      renderCarritoMovil();
+    }
+
+    function renderCarritoMovil() {
+      const cont = document.getElementById('m-carrito-lista');
+      if (carritoMovil.length === 0) {
+        cont.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">El carrito está vacío</p>';
+        document.getElementById('m-cart-total').innerText = '$0.00';
+        return;
+      }
+
+      let subtotal = 0;
+      cont.innerHTML = carritoMovil.map((item, idx) => {
+        const sub = item.precio * item.cant;
+        subtotal += sub;
+        return `
+          <div class="item-row">
+            <div class="item-info">
+              <div class="item-title">${item.nombre}</div>
+              <div class="item-sub" style="margin-top:3px;">
+                Precio U: <input type="number" step="0.01" value="${item.precio}" onchange="cambiarPrecioMovil(${idx}, this.value)" style="width:85px; padding:3px 5px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;">
+                <small style="color:#777;">(Costo: $${item.costo.toFixed(2)})</small>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <button onclick="cambiarCantMovil(${idx}, -1)" style="padding:4px 10px; font-weight:bold; border-radius:4px; border:1px solid #ccc;">-</button>
+              <b>${item.cant}</b>
+              <button onclick="cambiarCantMovil(${idx}, 1)" style="padding:4px 10px; font-weight:bold; border-radius:4px; border:1px solid #ccc;">+</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const recargoPorc = parseFloat(document.getElementById('m-recargo')?.value) || 0;
+      const montoRecargo = subtotal * (recargoPorc / 100);
+      const totalFinal = subtotal + montoRecargo;
+
+      let resumenHTML = `$${totalFinal.toFixed(2)}`;
+      if (recargoPorc > 0) {
+        resumenHTML += `<br><small style="font-size:0.75rem; color:#e67e22;">(Subtotal: $${subtotal.toFixed(2)} + ${recargoPorc}% Recargo)</small>`;
+      }
+
+      document.getElementById('m-cart-total').innerHTML = resumenHTML;
+    }
+
+    function cambiarCantMovil(idx, delta) {
+      carritoMovil[idx].cant += delta;
+      if (carritoMovil[idx].cant <= 0) {
+        carritoMovil.splice(idx, 1);
+      }
+      renderCarritoMovil();
+    }
+
+    // REGISTRO DE VENTAS DESDE MÓVIL
+    async function cobrarVentaMovil() {
+      if (carritoMovil.length === 0) return alert('Agrega al menos un producto al carrito.');
+
+      for (let i = 0; i < carritoMovil.length; i++) {
+        if (carritoMovil[i].precio < carritoMovil[i].costo) {
+          return alert(`El producto "${carritoMovil[i].nombre}" tiene un precio menor a su costo. Por favor ajustalo.`);
+        }
+      }
+
+      const metodo = document.getElementById('m-metodo-pago').value;
+      if (metodo === 'transferencia' && !fotoVentaComprobanteNombre) {
+        if (!confirm('No adjuntaste foto del comprobante de transferencia. ¿Deseas continuar de todas formas?')) {
+          return;
+        }
+      }
+
+      const btn = document.getElementById('m-btn-cobrar');
+      btn.disabled = true;
+
+      const cliente = document.getElementById('m-cliente').value.trim() || 'Venta Móvil Mostrador';
+      const comisionadoVal = document.getElementById('m-comisionado').value;
+      const comisionadoId = comisionadoVal ? parseInt(comisionadoVal) : null;
+      
+      const subtotal = carritoMovil.reduce((acc, i) => acc + (i.precio * i.cant), 0);
+      const recargoPorc = parseFloat(document.getElementById('m-recargo').value) || 0;
+      const montoRecargo = subtotal * (recargoPorc / 100);
+      const totalFinal = subtotal + montoRecargo;
+
+      const payload = {
+        cliente_nombre: cliente,
+        comisionado_id: comisionadoId,
+        items: carritoMovil.map(i => ({ 
+          producto_id: parseInt(i.id), 
+          cantidad: parseInt(i.cant), 
+          precio: parseFloat(i.precio) 
+        })),
+        subtotal: subtotal,
+        descuento: 0,
+        pago_efectivo: metodo === 'efectivo' ? totalFinal : 0,
+        pago_tarjeta: metodo === 'tarjeta' ? totalFinal : 0,
+        pago_transferencia: metodo === 'transferencia' ? totalFinal : 0,
+        pago_qr: metodo === 'qr' ? totalFinal : 0,
+        total: totalFinal
+      };
+
+      try {
+        const res = await fetch(`${API}/ventas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          alert('¡Venta realizada y registrada con éxito!');
+          
+          let recargoTxt = recargoPorc > 0 ? `\nRecargo (${recargoPorc}%): +$${montoRecargo.toFixed(2)}` : '';
+          let comprobanteTxt = (metodo === 'transferencia' && fotoVentaComprobanteNombre) ? `\n📸 Comprobante: ${fotoVentaComprobanteNombre}` : '';
+
+          const textoMsg = `🛒 *COMPROBANTE DE VENTA BENEMEX*\n\n` +
+            `Venta #${data.venta_id || ''}\n` +
+            `Cliente: ${cliente}\n` +
+            `Fecha: ${formatearFecha24hs(new Date())}\n` +
+            `Medio de Pago: ${metodo.toUpperCase()}${comprobanteTxt}\n\n` +
+            `*Detalle:*\n` + carritoMovil.map(i => `- ${i.cant}x ${i.nombre} ($${i.precio.toFixed(2)})`).join('\n') +
+            `\nSubtotal: $${subtotal.toFixed(2)}${recargoTxt}` +
+            `\n\n*TOTAL: $${totalFinal.toFixed(2)}*`;
+
+          if (confirm('¿Deseas enviar el comprobante de esta venta por WhatsApp?')) {
+            compartirWhatsApp(textoMsg);
+          }
+
+          carritoMovil = [];
+          document.getElementById('m-cliente').value = '';
+          document.getElementById('m-recargo').value = '0';
+          document.getElementById('m-metodo-pago').value = 'efectivo';
+          toggleCampoComprobanteVenta();
+          renderCarritoMovil();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          alert('Error al procesar la venta: ' + (errData.error || res.statusText));
+        }
+      } catch (err) {
+        alert('Error de conexión con el servidor: ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // LISTADO Y PROCESAMIENTO DE DEVOLUCIONES MÓVIL
+    async function cargarVentasMovil() {
+      const cont = document.getElementById('m-lista-ventas');
+      cont.innerHTML = '<p style="text-align:center; color:#888;">Cargando ventas...</p>';
+      try {
+        const res = await fetch(`${API}/ventas`);
+        ventasCargadas = await res.json();
+        renderListaVentasMovil(ventasCargadas);
+      } catch (e) {
+        cont.innerHTML = '<p style="text-align:center; color:#e74c3c;">Error al cargar ventas.</p>';
+      }
+    }
+
+    function renderListaVentasMovil(lista) {
+      const cont = document.getElementById('m-lista-ventas');
+      if (lista.length === 0) {
+        cont.innerHTML = '<p style="text-align:center; color:#888;">No hay ventas registradas.</p>';
+        return;
+      }
+
+      cont.innerHTML = lista.map(v => {
+        const esDev = v.devuelta == 1 || v.estado === 'Devuelto';
+        const badge = esDev ? '<span class="badge badge-devueltas">DEVUELTA</span>' : '<span class="badge badge-ok">COMPLETADA</span>';
+        
+        const btnDev = esDev 
+          ? `<button class="btn btn-primary" style="padding:6px; font-size:0.8rem; width:auto;" disabled>Procesada</button>`
+          : `<button class="btn btn-warning" style="padding:6px; font-size:0.8rem; width:auto;" onclick="abrirModalDevolucion(${v.id})">Devolver</button>`;
+
+        return `
+          <div class="item-row">
+            <div class="item-info">
+              <div class="item-title">Venta #${v.id} - ${v.cliente_nombre}</div>
+              <div class="item-sub">${formatearFecha24hs(v.fecha)} | Total: <b>$${v.total.toFixed(2)}</b></div>
+              <div style="margin-top:3px;">${badge}</div>
+            </div>
+            <div>${btnDev}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filtrarVentas(q) {
+      const term = q.toLowerCase().trim();
+      const res = ventasCargadas.filter(v => 
+        String(v.id).includes(term) || (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term))
+      );
+      renderListaVentasMovil(res);
+    }
+
+    async function abrirModalDevolucion(ventaId) {
+      try {
+        const res = await fetch(`${API}/ventas/${ventaId}/detalles`);
+        const data = await res.json();
+        ventaSeleccionadaDev = data;
+
+        if (data.venta.devuelta == 1 || data.venta.estado === 'Devuelto') {
+          alert("Esta venta ya fue devuelta previamente.");
+          return;
+        }
+
+        document.getElementById('m-dev-info-venta').innerText = `Venta #${data.venta.id} - Cliente: ${data.venta.cliente_nombre} ($${data.venta.total.toFixed(2)})`;
+        
+        const contItems = document.getElementById('m-dev-items-lista');
+        contItems.innerHTML = data.items.map(i => `
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.9rem; margin-bottom:5px;">
+            <span>${i.cantidad}x ${i.nombre}</span>
+            <b>$${(i.cantidad * i.precio_unitario).toFixed(2)}</b>
+          </div>
+        `).join('');
+
+        document.getElementById('m-dev-foto').value = '';
+        document.getElementById('m-dev-foto-preview').innerHTML = '';
+        fotoDevolucionNombre = '';
+
+        document.getElementById('modal-devolucion').style.display = 'flex';
+      } catch (e) {
+        alert('No se pudieron obtener los detalles de la venta.');
+      }
+    }
+
+    function previsualizarFotoDevolucion(input) {
+      const prev = document.getElementById('m-dev-foto-preview');
+      if (input.files && input.files[0]) {
+        fotoDevolucionNombre = input.files[0].name;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          prev.innerHTML = `<img src="${e.target.result}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #ccc;">`;
+        }
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        prev.innerHTML = '';
+        fotoDevolucionNombre = '';
+      }
+    }
+
+    function cerrarModalDevolucion() {
+      document.getElementById('modal-devolucion').style.display = 'none';
+      ventaSeleccionadaDev = null;
+    }
+
+    async function confirmarDevolucionMovil() {
+      if (!ventaSeleccionadaDev) return;
+      
+      const btn = document.getElementById('m-btn-confirmar-dev');
+      btn.disabled = true;
+
+      const v = ventaSeleccionadaDev.venta;
+      const items = ventaSeleccionadaDev.items;
+      const metodo = document.getElementById('m-dev-metodo').value;
+      let motivo = document.getElementById('m-dev-motivo').value.trim() || 'Devolución App Móvil';
+
+      if (fotoDevolucionNombre) {
+        motivo += ` [Adjunto: ${fotoDevolucionNombre}]`;
+      }
+
+      const payload = {
+        venta_id: v.id,
+        monto: v.total,
+        metodo_pago: metodo,
+        motivo: motivo,
+        items: items
+      };
+
+      try {
+        const res = await fetch(`${API}/devoluciones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          alert('¡Devolución registrada correctamente!');
+          
+          const textoDev = `🔄 *NOTIFICACIÓN DE DEVOLUCIÓN BENEMEX*\n\n` +
+            `Venta Devuelta: #${v.id}\n` +
+            `Cliente: ${v.cliente_nombre}\n` +
+            `Fecha Devolución: ${formatearFecha24hs(new Date())}\n` +
+            `Monto Reintegrado: $${v.total.toFixed(2)}\n` +
+            `Medio de Reembolso: ${metodo.toUpperCase()}\n` +
+            `Motivo: ${motivo}`;
+
+          if (confirm('¿Deseas enviar el aviso de devolución por WhatsApp?')) {
+            compartirWhatsApp(textoDev);
+          }
+
+          cerrarModalDevolucion();
+          cargarVentasMovil();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.error || 'Error al registrar la devolución.');
+        }
+      } catch (e) {
+        alert('Error de conexión con el servidor.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ENVÍO DE HISTORIAL COMPLETO DEL DÍA A WHATSAPP
+    async function enviarHistorialDiaWhatsApp() {
+      try {
+        const hoyIso = new Date().toISOString().slice(0, 10);
+        const hoyFormateado = new Date().toLocaleDateString('es-AR');
+
+        const rVentas = await fetch(`${API}/ventas`);
+        const todasVentas = await rVentas.json();
+        
+        const rDevs = await fetch(`${API}/devoluciones`);
+        const todasDevs = await rDevs.json();
+
+        const ventasHoy = todasVentas.filter(v => v.fecha && v.fecha.startsWith(hoyIso));
+        const devsHoy = todasDevs.filter(d => d.fecha && d.fecha.startsWith(hoyIso));
+
+        if (ventasHoy.length === 0 && devsHoy.length === 0) {
+          return alert(`No hay registro de ventas ni devoluciones para el día de hoy (${hoyFormateado}).`);
+        }
+
+        let totalVentasMonto = 0;
+        let reporteTexto = `📊 *HISTORIAL DIARIO BENEMEX*\n`;
+        reporteTexto += `📅 Fecha: ${hoyFormateado}\n`;
+        reporteTexto += `==============================\n\n`;
+
+        reporteTexto += `🛒 *VENTAS REALIZADAS (${ventasHoy.length}):*\n`;
+        if (ventasHoy.length === 0) {
+          reporteTexto += `_Sin ventas registradas hoy_\n`;
+        } else {
+          for (const v of ventasHoy) {
+            const esDev = v.devuelta == 1 || v.estado === 'Devuelto';
+            const estadoStr = esDev ? '🔴 [DEVUELTA]' : '🟢 [COMPLETADA]';
+            if (!esDev) totalVentasMonto += (v.total || 0);
+
+            reporteTexto += `\n*Venta #${v.id}* ${estadoStr}\n`;
+            reporteTexto += `• Cliente: ${v.cliente_nombre || 'Mostrador'}\n`;
+            reporteTexto += `• Hora: ${formatearFecha24hs(v.fecha).split(' ')[1] || '-'}\n`;
+
+            try {
+              const rDet = await fetch(`${API}/ventas/${v.id}/detalles`);
+              const detData = await rDet.json();
+              if (detData.items && detData.items.length > 0) {
+                reporteTexto += `• Productos:\n`;
+                detData.items.forEach(i => {
+                  reporteTexto += `   - ${i.cantidad}x ${i.nombre} ($${i.precio_unitario.toFixed(2)} c/u)\n`;
+                });
+              }
+            } catch (e) {}
+
+            reporteTexto += `• Total Venta: *$${v.total.toFixed(2)}*\n`;
+          }
+        }
+
+        reporteTexto += `\n==============================\n`;
+
+        let totalDevsMonto = 0;
+        reporteTexto += `\n🔄 *DEVOLUCIONES REGISTRADAS (${devsHoy.length}):*\n`;
+        if (devsHoy.length === 0) {
+          reporteTexto += `_Sin devoluciones registradas hoy_\n`;
+        } else {
+          devsHoy.forEach(d => {
+            const montoDev = d.total_monto || 0;
+            totalDevsMonto += montoDev;
+            reporteTexto += `\n- *${d.origen}*\n`;
+            reporteTexto += `  • Detalle: ${d.detalles}\n`;
+            reporteTexto += `  • Reembolso: ${d.detalle_pago}\n`;
+            reporteTexto += `  • Monto Devuelto: *-$${montoDev.toFixed(2)}*\n`;
+          });
+        }
+
+        const balanceNeto = totalVentasMonto - totalDevsMonto;
+        reporteTexto += `\n==============================\n`;
+        reporteTexto += `💰 *RESUMEN Y BALANCE DIARIO:*\n`;
+        reporteTexto += `• Total Ventas Activas: $${totalVentasMonto.toFixed(2)}\n`;
+        reporteTexto += `• Total Devoluciones: -$${totalDevsMonto.toFixed(2)}\n`;
+        reporteTexto += `• *BALANCE NETO DIARIO: $${balanceNeto.toFixed(2)}*\n`;
+
+        compartirWhatsApp(reporteTexto);
+      } catch (err) {
+        alert("Error al compilar el historial diario: " + err.message);
+      }
+    }
+
+    // UTILIDAD DE ENVÍO A WHATSAPP
+    function compartirWhatsApp(texto) {
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+      window.open(url, '_blank');
+    }
+  </script>
+</body>
+</html>
