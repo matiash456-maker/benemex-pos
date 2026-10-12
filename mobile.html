@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BENEMEX POS">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60'>📱</text></svg>">
-  <link rel="manifest" id="pwa-manifest-link" href="manifest.json">
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22POS%20BENEMEX%20M%C3%B3vil%22%2C%22short_name%22%3A%22BENEMEX%22%2C%22start_url%22%3A%22%2Fmobile.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%232c3e50%22%2C%22theme_color%22%3A%22%232c3e50%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%232c3e50'%2F%3E%3Ctext%20x%3D'50%25'%20y%3D'55%25'%20dominant-baseline%3D'middle'%20text-anchor%3D'middle'%20font-size%3D'60'%3E%F0%9F%93%B1%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 
   <!-- Librería para lectura de Código de Barras con la cámara -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -69,10 +69,7 @@
 
   <header>
     <h1>📱 POS BENEMEX Móvil</h1>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <button id="btn-instalar-pwa" style="display:none; background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; font-weight:bold; font-size:0.8rem; cursor:pointer;" onclick="instalarPWA()">📥 Instalar App</button>
-      <span id="clock-24">00:00:00</span>
-    </div>
+    <span id="clock-24">00:00:00</span>
   </header>
 
   <!-- PESTAÑA 1: COBRO Y VENTAS -->
@@ -216,68 +213,6 @@
   </nav>
 
   <script>
-    // REGISTRO Y SOPORTE PWA INSTALABLE
-    let deferredPrompt = null;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const btn = document.getElementById('btn-instalar-pwa');
-      if (btn) btn.style.display = 'inline-block';
-    });
-
-    function instalarPWA() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            document.getElementById('btn-instalar-pwa').style.display = 'none';
-          }
-          deferredPrompt = null;
-        });
-      }
-    }
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        const swCode = `
-          self.addEventListener('install', (e) => self.skipWaiting());
-          self.addEventListener('activate', (e) => self.clients.claim());
-          self.addEventListener('fetch', (e) => {
-            e.respondWith(fetch(e.request).catch(() => new Response('Offline')));
-          });
-        `;
-        try {
-          const blob = new Blob([swCode], { type: 'application/javascript' });
-          const swUrl = URL.createObjectURL(blob);
-          navigator.serviceWorker.register(swUrl).catch(() => {
-            navigator.serviceWorker.register('/sw.js').catch(()=>{});
-          });
-        } catch(e) {
-          navigator.serviceWorker.register('/sw.js').catch(()=>{});
-        }
-      });
-    }
-
-    // MANIFEST BLOB POR SI NO EXISTE ARCHIVO FISICO MANIFEST.JSON EN EL SERVIDOR
-    try {
-      const manifestObj = {
-        name: "POS BENEMEX Móvil",
-        short_name: "BENEMEX",
-        start_url: "/mobile.html",
-        display: "standalone",
-        background_color: "#2c3e50",
-        theme_color: "#2c3e50",
-        icons: [{
-          src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60'>📱</text></svg>",
-          sizes: "192x192 512x512",
-          type: "image/svg+xml"
-        }]
-      };
-      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
-      const manifestUrl = URL.createObjectURL(manifestBlob);
-      document.getElementById('pwa-manifest-link').href = manifestUrl;
-    } catch(e) {}
-
     // DETECCIÓN DINÁMICA DE LA DIRECCIÓN DEL SERVIDOR
     const API = window.location.origin.startsWith('http') ? `${window.location.origin}/api` : 'https://benemex-pos.onrender.com/api';
     
@@ -698,139 +633,3 @@
         fotoDevolucionFile = input.files[0];
         fotoDevolucionNombre = input.files[0].name;
         const reader = new FileReader();
-        reader.onload = function(e) {
-          prev.innerHTML = `<img src="${e.target.result}" style="max-width:100px; max-height:100px; border-radius:6px; border:1px solid #ccc;">`;
-        }
-        reader.readAsDataURL(input.files[0]);
-      } else {
-        prev.innerHTML = '';
-        fotoDevolucionNombre = '';
-        fotoDevolucionFile = null;
-      }
-    }
-
-    function cerrarModalDevolucion() {
-      document.getElementById('modal-devolucion').style.display = 'none';
-      ventaSeleccionadaDev = null;
-    }
-
-    async function confirmarDevolucionMovil() {
-      if (!ventaSeleccionadaDev) return;
-      
-      const btn = document.getElementById('m-btn-confirmar-dev');
-      btn.disabled = true;
-
-      const v = ventaSeleccionadaDev.venta;
-      const items = ventaSeleccionadaDev.items;
-      const metodo = document.getElementById('m-dev-metodo').value;
-      let motivo = document.getElementById('m-dev-motivo').value.trim() || 'Devolución App Móvil';
-
-      if (fotoDevolucionNombre) {
-        motivo += ` [Adjunto: ${fotoDevolucionNombre}]`;
-      }
-
-      const payload = {
-        venta_id: v.id,
-        monto: v.total,
-        metodo_pago: metodo,
-        motivo: motivo,
-        items: items
-      };
-
-      try {
-        const res = await fetch(`${API}/devoluciones`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          alert('¡Devolución registrada correctamente!');
-          
-          const textoDev = `🔄 *NOTIFICACIÓN DE DEVOLUCIÓN BENEMEX*\n\n` +
-            `Venta Devuelta: #${v.id}\n` +
-            `Cliente: ${v.cliente_nombre}\n` +
-            `Fecha Devolución: ${formatearFecha24hs(new Date())}\n` +
-            `Monto Reintegrado: $${v.total.toFixed(2)}\n` +
-            `Medio de Reembolso: ${metodo.toUpperCase()}\n` +
-            `Motivo: ${motivo}`;
-
-          const fotoDevParaCompartir = fotoDevolucionFile;
-
-          if (confirm('¿Deseas enviar el aviso de devolución por WhatsApp?')) {
-            await compartirWhatsApp(textoDev, fotoDevParaCompartir);
-          }
-
-          cerrarModalDevolucion();
-          cargarVentasMovil();
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          alert(errData.error || 'Error al registrar la devolución.');
-        }
-      } catch (e) {
-        alert('Error de conexión con el servidor.');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    // ENVÍO DE HISTORIAL COMPLETO DEL DÍA A WHATSAPP
-    async function enviarHistorialDiaWhatsApp() {
-      try {
-        const hoyIso = new Date().toISOString().slice(0, 10);
-        const hoyFormateado = new Date().toLocaleDateString('es-AR');
-
-        const rVentas = await fetch(`${API}/ventas`);
-        const todasVentas = await rVentas.json();
-        
-        const rDevs = await fetch(`${API}/devoluciones`);
-        const todasDevs = await rDevs.json();
-
-        const ventasHoy = todasVentas.filter(v => v.fecha && v.fecha.startsWith(hoyIso));
-        const devsHoy = todasDevs.filter(d => d.fecha && d.fecha.startsWith(hoyIso));
-
-        if (ventasHoy.length === 0 && devsHoy.length === 0) {
-          return alert(`No hay registro de ventas ni devoluciones para el día de hoy (${hoyFormateado}).`);
-        }
-
-        let totalVentasMonto = 0;
-        let reporteTexto = `📊 *HISTORIAL DIARIO BENEMEX*\n`;
-        reporteTexto += `📅 Fecha: ${hoyFormateado}\n`;
-        reporteTexto += `==============================\n\n`;
-
-        reporteTexto += `🛒 *VENTAS REALIZADAS (${ventasHoy.length}):*\n`;
-        if (ventasHoy.length === 0) {
-          reporteTexto += `_Sin ventas registradas hoy_\n`;
-        } else {
-          for (const v of ventasHoy) {
-            const esDev = v.devuelta == 1 || v.estado === 'Devuelto';
-            const estadoStr = esDev ? '🔴 [DEVUELTA]' : '🟢 [COMPLETADA]';
-            if (!esDev) totalVentasMonto += (v.total || 0);
-
-            reporteTexto += `\n*Venta #${v.id}* ${estadoStr}\n`;
-            reporteTexto += `• Cliente: ${v.cliente_nombre || 'Mostrador'}\n`;
-            reporteTexto += `• Hora: ${formatearFecha24hs(v.fecha).split(' ')[1] || '-'}\n`;
-
-            try {
-              const rDet = await fetch(`${API}/ventas/${v.id}/detalles`);
-              const detData = await rDet.json();
-              if (detData.items && detData.items.length > 0) {
-                reporteTexto += `• Productos:\n`;
-                detData.items.forEach(i => {
-                  reporteTexto += `   - ${i.cantidad}x ${i.nombre} ($${i.precio_unitario.toFixed(2)} c/u)\n`;
-                });
-              }
-            } catch (e) {}
-
-            reporteTexto += `• Total Venta: *$${v.total.toFixed(2)}*\n`;
-          }
-        }
-
-        reporteTexto += `\n==============================\n`;
-
-        let totalDevsMonto = 0;
-        reporteTexto += `\n🔄 *DEVOLUCIONES REGISTRADAS (${devsHoy.length}):*\n`;
-        if (devsHoy.length === 0) {
-          reporteTexto += `_Sin devoluciones registradas hoy_\n`;
-        } else {
-          devs
