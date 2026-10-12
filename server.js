@@ -8,7 +8,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// INICIALIZACIÓN AUTOMÁTICA DE TABLAS Y COLUMNAS PARA COMISIONES
+// INICIALIZACIÓN AUTOMÁTICA DE TABLAS Y COLUMNAS PARA COMISIONES Y DEVOLUCIONES
 async function initComisionesDatabase() {
   try {
     await db.execute(`
@@ -31,8 +31,10 @@ async function initComisionesDatabase() {
     `);
     try { await db.execute("ALTER TABLE ventas ADD COLUMN comisionado_id INTEGER"); } catch (e) {}
     try { await db.execute("ALTER TABLE pedidos ADD COLUMN comisionado_id INTEGER"); } catch (e) {}
+    try { await db.execute("ALTER TABLE ventas ADD COLUMN estado TEXT DEFAULT 'completada'"); } catch (e) {}
+    try { await db.execute("ALTER TABLE ventas ADD COLUMN devuelta INTEGER DEFAULT 0"); } catch (e) {}
   } catch (err) {
-    console.error("Error inicializando tablas de comisiones:", err);
+    console.error("Error inicializando tablas:", err);
   }
 }
 initComisionesDatabase();
@@ -73,7 +75,7 @@ async function registrarVentaDesdePedido(pedidoId) {
 
   const totalFinal = (p.sena_efectivo||0) + (p.sena_tarjeta||0) + (p.sena_transferencia||0) + (p.sena_qr||0);
   const vRes = await db.execute({
-    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id, estado, devuelta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "completada", 0)',
     args: [p.subtotal, p.descuento, p.sena_efectivo, p.sena_tarjeta, p.sena_transferencia, p.sena_qr, totalFinal, p.cliente_nombre, p.comisionado_id || null]
   });
   const ventaId = Number(vRes.lastInsertRowid);
@@ -138,7 +140,7 @@ app.get('/api/caja/pre-cierre', async (req, res) => {
   const caja = cajaRes.rows[0];
   if(!caja) return res.json({ esperado: 0 });
 
-  const ventasEf = (await db.execute({ sql: "SELECT SUM(pago_efectivo) as t FROM ventas WHERE fecha >= ?", args: [caja.fecha_apertura] })).rows[0]?.t || 0;
+  const ventasEf = (await db.execute({ sql: "SELECT SUM(pago_efectivo) as t FROM ventas WHERE fecha >= ? AND (devuelta IS NULL OR devuelta = 0) AND estado != 'Devuelto'", args: [caja.fecha_apertura] })).rows[0]?.t || 0;
   const senasEf = (await db.execute({ sql: "SELECT SUM(sena_efectivo) as s FROM pedidos WHERE fecha >= ? AND estado = 'falta_saldar'", args: [caja.fecha_apertura] })).rows[0]?.s || 0;
   const egresosEf = (await db.execute({ sql: "SELECT SUM(monto) as m FROM egresos WHERE fecha >= ? AND metodo_pago = 'efectivo'", args: [caja.fecha_apertura] })).rows[0]?.m || 0;
 
@@ -303,6 +305,7 @@ app.get('/api/comisiones/ventas', async (req, res) => {
     JOIN detalle_ventas dv ON dv.venta_id = v.id
     JOIN productos prod ON prod.id = dv.producto_id
     LEFT JOIN pedidos p ON p.venta_id = v.id
+    WHERE (v.devuelta IS NULL OR v.devuelta = 0) AND v.estado != 'Devuelto'
     ORDER BY v.fecha DESC
   `;
   const r = await db.execute(query);
@@ -355,7 +358,7 @@ app.get('/api/ventas', async (req, res) => {
 app.post('/api/ventas', async (req, res) => {
   const { subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, items, comisionado_id } = req.body;
   const vRes = await db.execute({
-    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id, estado, devuelta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "completada", 0)',
     args: [subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre || 'Venta de Mostrador', comisionado_id || null]
   });
   const ventaId = Number(vRes.lastInsertRowid);
@@ -414,7 +417,7 @@ app.post('/api/ventas/:id/modificar-cantidad', async (req, res) => {
 
   const nuevosItems = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [req.params.id] })).rows;
   if (nuevosItems.length === 0) {
-    await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [req.params.id] });
+    await db.execute({ sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?", args: [req.params.id] });
   } else {
     const nuevoSubtotal = nuevosItems.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
     const nuevoTotal = Math.max(0, nuevoSubtotal - v.descuento);
@@ -449,7 +452,7 @@ app.post('/api/ventas/:id/agregar-item', async (req, res) => {
   const nuevosItems = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [req.params.id] })).rows;
   const nuevoSubtotal = nuevosItems.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
   const nuevoTotal = Math.max(0, nuevoSubtotal - v.descuento);
-  await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ? WHERE id = ?', args: [nuevoSubtotal, nuevoTotal, req.params.id] });
+  await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ?, estado = "completada", devuelta = 0 WHERE id = ?', args: [nuevoSubtotal, nuevoTotal, req.params.id] });
 
   res.json({ mensaje: 'Ítem agregado a venta' });
 });
@@ -471,13 +474,12 @@ app.post('/api/ventas/:id/devolver-total', async (req, res) => {
     });
   }
   
-  await db.execute({ sql: 'DELETE FROM detalle_ventas WHERE venta_id = ?', args: [v.id] });
-  await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [v.id] });
+  await db.execute({ sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?", args: [v.id] });
 
-  res.json({ mensaje: 'Venta cancelada totalmente' });
+  res.json({ mensaje: 'Venta devuelta totalmente' });
 });
 
-// HISTORIAL DE DEVOLUCIONES UNIFICADO
+// HISTORIAL Y REGISTRO DE DEVOLUCIONES UNIFICADO (PC Y MÓVIL)
 app.get('/api/devoluciones', async (req, res) => {
   const r = await db.execute(`
     SELECT
@@ -501,6 +503,70 @@ app.get('/api/devoluciones', async (req, res) => {
     ORDER BY fecha DESC
   `);
   res.json(r.rows);
+});
+
+app.post('/api/devoluciones', async (req, res) => {
+  const { venta_id, turno_id, monto, metodo_pago, motivo, items } = req.body;
+
+  try {
+    // 1. Marcar la venta como devuelta
+    await db.execute({
+      sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?",
+      args: [venta_id]
+    });
+
+    // 2. Reingresar el stock de cada producto devuelto
+    let itemsArray = items;
+    if (typeof itemsArray === 'string') {
+      try { itemsArray = JSON.parse(itemsArray); } catch(e) { itemsArray = []; }
+    }
+
+    if (itemsArray && itemsArray.length > 0) {
+      for (const item of itemsArray) {
+        const prodId = item.producto_id || item.id;
+        const cant = parseInt(item.cantidad || 1);
+        if (prodId && !isNaN(cant)) {
+          await db.execute({
+            sql: "UPDATE productos SET stock = stock + ? WHERE id = ?",
+            args: [cant, prodId]
+          });
+        }
+      }
+    }
+
+    // 3. Registrar transacción en historial_devoluciones
+    const vRes = await db.execute({ sql: 'SELECT cliente_nombre FROM ventas WHERE id = ?', args: [venta_id] });
+    const clienteNombre = vRes.rows[0]?.cliente_nombre || 'App Móvil';
+    const metStr = formatMetodoReembolso(metodo_pago);
+    const motivoTexto = motivo || 'Devolución App Móvil';
+
+    if (itemsArray && itemsArray.length > 0) {
+      for (const item of itemsArray) {
+        const prodId = item.producto_id || item.id;
+        const cant = parseInt(item.cantidad || 1);
+        const precioU = parseFloat(item.precio || item.precio_unitario || 0);
+        const nombreP = item.nombre || 'Producto';
+        const imgP = item.imagen || '';
+
+        await db.execute({
+          sql: `INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [venta_id, prodId || null, nombreP, imgP, cant, precioU, cant * precioU, `App Móvil (${motivoTexto}) - ${clienteNombre}`, metStr]
+        });
+      }
+    } else {
+      await db.execute({
+        sql: `INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [venta_id, null, `Devolución (${motivoTexto})`, '', 1, monto, monto, `App Móvil - ${clienteNombre}`, metStr]
+      });
+    }
+
+    res.json({ success: true, mensaje: 'Devolución procesada y stock restaurado' });
+  } catch (err) {
+    console.error("Error al procesar devolución:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- EGRESOS ---
@@ -684,8 +750,7 @@ app.delete('/api/pedidos/:id', async (req, res) => {
   if (!p) return res.json({ mensaje: 'Pedido no encontrado' });
   
   if (p.venta_id) {
-     await db.execute({ sql: 'DELETE FROM detalle_ventas WHERE venta_id = ?', args: [p.venta_id] });
-     await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [p.venta_id] });
+     await db.execute({ sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?", args: [p.venta_id] });
   }
 
   const detallesRes = await db.execute({ sql: 'SELECT dp.*, prod.nombre, prod.imagen FROM detalle_pedidos dp JOIN productos prod ON prod.id = dp.producto_id WHERE dp.pedido_id = ?', args: [p.id] });
@@ -759,7 +824,7 @@ app.post('/api/pedidos/:id/modificar-cantidad', async (req, res) => {
     }
     const nuevosDetV = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [det.venta_id] })).rows;
     if (nuevosDetV.length === 0) {
-      await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [det.venta_id] });
+      await db.execute({ sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?", args: [det.venta_id] });
     } else {
       const nuevoSubV = nuevosDetV.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
       const vOriginal = (await db.execute({ sql: 'SELECT descuento FROM ventas WHERE id = ?', args: [det.venta_id] })).rows[0];
@@ -778,7 +843,7 @@ app.post('/api/pedidos/:id/modificar-cantidad', async (req, res) => {
         args: [req.params.id, null, 'Pedido Cancelado Totalmente', '', 1, totalSenaPagada, totalSenaPagada, `Pedido Cancelado - ${ped.cliente_nombre}`, metStr]
       });
     }
-    if (ped.venta_id) await db.execute({ sql: 'DELETE FROM ventas WHERE id = ?', args: [ped.venta_id] });
+    if (ped.venta_id) await db.execute({ sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?", args: [ped.venta_id] });
     await db.execute({ sql: 'DELETE FROM pedidos WHERE id = ?', args: [req.params.id] });
   } else {
     const nuevoSub = nuevosDet.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
@@ -870,7 +935,7 @@ app.post('/api/pedidos/:id/agregar-item', async (req, res) => {
     }
     const nuevosDetV = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [ped.venta_id] })).rows;
     const nuevoSubV = nuevosDetV.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ? WHERE id = ?', args: [nuevoSubV, Math.max(0, nuevoSubV - ped.descuento), ped.venta_id] });
+    await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ?, estado = "completada", devuelta = 0 WHERE id = ?', args: [nuevoSubV, Math.max(0, nuevoSubV - ped.descuento), ped.venta_id] });
   }
 
   const nuevosDet = (await db.execute({ sql: 'SELECT * FROM detalle_pedidos WHERE pedido_id = ?', args: [req.params.id] })).rows;
@@ -891,13 +956,13 @@ app.post('/api/pedidos/:id/agregar-item', async (req, res) => {
 app.get('/api/reportes/dashboard', async (req, res) => {
   const mes = req.query.mes || new Date().toISOString().slice(0,7);
   
-  const v = (await db.execute({ sql: "SELECT SUM(total) as t FROM ventas WHERE strftime('%Y-%m', fecha) = ?", args: [mes] })).rows[0]?.t || 0;
-  const c = (await db.execute({ sql: "SELECT SUM(dv.cantidad * dv.costo_unitario) as c FROM detalle_ventas dv JOIN ventas v ON v.id = dv.venta_id WHERE strftime('%Y-%m', v.fecha) = ?", args: [mes] })).rows[0]?.c || 0;
+  const v = (await db.execute({ sql: "SELECT SUM(total) as t FROM ventas WHERE strftime('%Y-%m', fecha) = ? AND (devuelta IS NULL OR devuelta = 0) AND estado != 'Devuelto'", args: [mes] })).rows[0]?.t || 0;
+  const c = (await db.execute({ sql: "SELECT SUM(dv.cantidad * dv.costo_unitario) as c FROM detalle_ventas dv JOIN ventas v ON v.id = dv.venta_id WHERE strftime('%Y-%m', v.fecha) = ? AND (v.devuelta IS NULL OR v.devuelta = 0) AND v.estado != 'Devuelto'", args: [mes] })).rows[0]?.c || 0;
   const g = (await db.execute({ sql: "SELECT SUM(monto) as m FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto'", args: [mes] })).rows[0]?.m || 0;
   
-  const prods = (await db.execute({ sql: "SELECT p.nombre, SUM(dv.cantidad) as cant FROM detalle_ventas dv JOIN ventas v ON v.id=dv.venta_id JOIN productos p ON p.id=dv.producto_id WHERE strftime('%Y-%m', v.fecha) = ? GROUP BY p.id ORDER BY cant DESC LIMIT 10", args: [mes] })).rows;
+  const prods = (await db.execute({ sql: "SELECT p.nombre, SUM(dv.cantidad) as cant FROM detalle_ventas dv JOIN ventas v ON v.id=dv.venta_id JOIN productos p ON p.id=dv.producto_id WHERE strftime('%Y-%m', v.fecha) = ? AND (v.devuelta IS NULL OR v.devuelta = 0) AND v.estado != 'Devuelto' GROUP BY p.id ORDER BY cant DESC LIMIT 10", args: [mes] })).rows;
   const gas = (await db.execute({ sql: "SELECT categoria, SUM(monto) as m FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto' GROUP BY categoria ORDER BY m DESC LIMIT 10", args: [mes] })).rows;
-  const ev = (await db.execute({ sql: `SELECT strftime('%d', fecha) as d, SUM(total) as i, 0 as g FROM ventas WHERE strftime('%Y-%m', fecha) = ? GROUP BY d UNION ALL SELECT strftime('%d', fecha) as d, 0 as i, SUM(monto) as g FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto' GROUP BY d`, args: [mes, mes] })).rows;
+  const ev = (await db.execute({ sql: `SELECT strftime('%d', fecha) as d, SUM(total) as i, 0 as g FROM ventas WHERE strftime('%Y-%m', fecha) = ? AND (devuelta IS NULL OR devuelta = 0) AND estado != 'Devuelto' GROUP BY d UNION ALL SELECT strftime('%d', fecha) as d, 0 as i, SUM(monto) as g FROM egresos WHERE strftime('%Y-%m', fecha) = ? AND tipo = 'gasto' GROUP BY d`, args: [mes, mes] })).rows;
 
   res.json({ pl: { ventas: v, cogs: c, gastos: g, neta: v - c - g }, prods, gas, ev });
 });
@@ -905,25 +970,25 @@ app.get('/api/reportes/dashboard', async (req, res) => {
 // ENDPOINT PARA INFORME FINANCIERO DETALLADO OPERATIVO
 app.get('/api/reportes/detallado', async (req, res) => {
   const { desde, hasta, mes } = req.query;
-  let condVentas = "";
-  let condEgresos = "";
+  let condVentas = "WHERE (v.devuelta IS NULL OR v.devuelta = 0) AND v.estado != 'Devuelto'";
+  let condEgresos = "WHERE tipo = 'gasto'";
   let paramsV = [];
   let paramsE = [];
 
   if (mes) {
-    condVentas = "WHERE strftime('%Y-%m', v.fecha) = ?";
-    condEgresos = "WHERE strftime('%Y-%m', fecha) = ?";
+    condVentas += " AND strftime('%Y-%m', v.fecha) = ?";
+    condEgresos += " AND strftime('%Y-%m', fecha) = ?";
     paramsV.push(mes);
     paramsE.push(mes);
   } else if (desde && hasta) {
-    condVentas = "WHERE DATE(v.fecha) >= ? AND DATE(v.fecha) <= ?";
-    condEgresos = "WHERE DATE(fecha) >= ? AND DATE(fecha) <= ?";
+    condVentas += " AND DATE(v.fecha) >= ? AND DATE(v.fecha) <= ?";
+    condEgresos += " AND DATE(fecha) >= ? AND DATE(fecha) <= ?";
     paramsV.push(desde, hasta);
     paramsE.push(desde, hasta);
   } else {
     const mesActual = new Date().toISOString().slice(0, 7);
-    condVentas = "WHERE strftime('%Y-%m', v.fecha) = ?";
-    condEgresos = "WHERE strftime('%Y-%m', fecha) = ?";
+    condVentas += " AND strftime('%Y-%m', v.fecha) = ?";
+    condEgresos += " AND strftime('%Y-%m', fecha) = ?";
     paramsV.push(mesActual);
     paramsE.push(mesActual);
   }
@@ -943,7 +1008,7 @@ app.get('/api/reportes/detallado', async (req, res) => {
 
   const qEgresos = `
     SELECT * FROM egresos
-    ${condEgresos ? condEgresos + " AND tipo = 'gasto'" : "WHERE tipo = 'gasto'"}
+    ${condEgresos}
     ORDER BY fecha DESC
   `;
   const egresosRes = await db.execute({ sql: qEgresos, args: paramsE });
