@@ -1930,6 +1930,21 @@ div:has(> table)::-webkit-scrollbar-thumb:hover,
       });
     });
 
+    <!-- Al final de index.html -->
+  <script>
+    // ... Tu código y funciones existentes (cargarVentas, etc.) ...
+
+    // AUTO-REFRESCO DE LA PC (Consulta cada 5 segundos)
+    document.addEventListener('DOMContentLoaded', () => {
+      setInterval(() => {
+        if (typeof cargarVentas === 'function') cargarVentas();
+        if (typeof cargarEstadoCaja === 'function') cargarEstadoCaja();
+      }, 5000);
+    });
+  </script>
+</body>
+</html>
+
     // INICIALIZACIÓN
     cargarComisionadosSelects();
   </script>
