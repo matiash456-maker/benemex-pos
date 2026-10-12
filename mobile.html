@@ -189,9 +189,12 @@
   </nav>
 
   <script>
-    const API = 'https://benemex-pos.onrender.com/api';
+    // DETECCIÓN DINÁMICA DE LA DIRECCIÓN DEL SERVIDOR
+    const API = window.location.origin.startsWith('http') ? `${window.location.origin}/api` : 'https://benemex-pos.onrender.com/api';
+    
     let carritoMovil = [];
     let ventasCargadas = [];
+    let ultimosProductosBuscados = [];
     let ventaSeleccionadaDev = null;
     let html5QrcodeScanner = null;
     let fotoDevolucionNombre = '';
@@ -205,7 +208,8 @@
     }
 
     setInterval(() => {
-      document.getElementById('clock-24').innerText = formatearFecha24hs(new Date()).split(' ')[1] || new Date().toLocaleTimeString('es-AR', { hour12: false });
+      const now = new Date();
+      document.getElementById('clock-24').innerText = now.toLocaleTimeString('es-AR', { hour12: false });
     }, 1000);
 
     function cambiarSeccion(secId, btn) {
@@ -219,6 +223,7 @@
     async function cargarComisionadosMovil() {
       try {
         const r = await fetch(`${API}/comisionados`);
+        if (!r.ok) return;
         const coms = await r.json();
         const sel = document.getElementById('m-comisionado');
         sel.innerHTML = '<option value="">Venta del Local (Sin comisión)</option>' +
@@ -276,7 +281,7 @@
           alert(`No se encontró ningún producto con el código: ${codigo}`);
         }
       } catch (e) {
-        alert("Error al buscar producto escanear.");
+        alert("Error al buscar producto por código.");
       }
     }
 
@@ -286,12 +291,12 @@
       if (q.length < 2) { box.style.display = 'none'; return; }
       try {
         const r = await fetch(`${API}/productos/buscar?q=${encodeURIComponent(q)}`);
-        const prods = await r.json();
-        if (prods.length === 0) { box.style.display = 'none'; return; }
+        ultimosProductosBuscados = await r.json();
+        if (ultimosProductosBuscados.length === 0) { box.style.display = 'none'; return; }
         
-        box.innerHTML = prods.map(p => `
-          <div class="sug-item" onclick="agregarAlCarritoMovil(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, ${p.costo || 0}, ${p.stock})">
-            <b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio}) <small>[Costo: $${(p.costo||0).toFixed(2)} | Stock: ${p.stock}]</small>
+        box.innerHTML = ultimosProductosBuscados.map(p => `
+          <div class="sug-item" onclick="seleccionarSugerenciaPorId(${p.id})">
+            <b>${p.codigo_barras || ''}</b> - ${p.nombre} ($${p.precio}) <small>[Costo: $${(p.costo||0).toFixed(2)} | Stock: ${p.stock}]</small>
           </div>
         `).join('');
         box.style.display = 'block';
@@ -300,12 +305,26 @@
       }
     }
 
+    function seleccionarSugerenciaPorId(id) {
+      const p = ultimosProductosBuscados.find(prod => prod.id === id);
+      if (p) {
+        agregarAlCarritoMovil(p.id, p.nombre, p.precio, p.costo || 0, p.stock);
+      }
+    }
+
     function agregarAlCarritoMovil(id, nombre, precio, costo, stock) {
       const exist = carritoMovil.find(i => i.id === id);
       if (exist) {
         exist.cant++;
       } else {
-        carritoMovil.push({ id, nombre, precio: parseFloat(precio)||0, costo: parseFloat(costo)||0, stock, cant: 1 });
+        carritoMovil.push({ 
+          id: parseInt(id), 
+          nombre: nombre, 
+          precio: parseFloat(precio)||0, 
+          costo: parseFloat(costo)||0, 
+          stock: parseInt(stock)||0, 
+          cant: 1 
+        });
       }
       document.getElementById('m-buscar-prod').value = '';
       document.getElementById('m-sug-prod').style.display = 'none';
@@ -390,7 +409,8 @@
 
       const cliente = document.getElementById('m-cliente').value.trim() || 'Venta Móvil Mostrador';
       const metodo = document.getElementById('m-metodo-pago').value;
-      const comisionadoId = document.getElementById('m-comisionado').value || null;
+      const comisionadoVal = document.getElementById('m-comisionado').value;
+      const comisionadoId = comisionadoVal ? parseInt(comisionadoVal) : null;
       
       const subtotal = carritoMovil.reduce((acc, i) => acc + (i.precio * i.cant), 0);
       const recargoPorc = parseFloat(document.getElementById('m-recargo').value) || 0;
@@ -400,7 +420,11 @@
       const payload = {
         cliente_nombre: cliente,
         comisionado_id: comisionadoId,
-        items: carritoMovil.map(i => ({ producto_id: i.id, cantidad: i.cant, precio: i.precio })),
+        items: carritoMovil.map(i => ({ 
+          producto_id: parseInt(i.id), 
+          cantidad: parseInt(i.cant), 
+          precio: parseFloat(i.precio) 
+        })),
         subtotal: subtotal,
         descuento: 0,
         pago_efectivo: metodo === 'efectivo' ? totalFinal : 0,
@@ -440,10 +464,11 @@
           document.getElementById('m-recargo').value = '0';
           renderCarritoMovil();
         } else {
-          alert('Ocurrió un error al procesar la venta.');
+          const errData = await res.json().catch(() => ({}));
+          alert('Error al procesar la venta: ' + (errData.error || res.statusText));
         }
       } catch (err) {
-        alert('Error de conexión con el servidor.');
+        alert('Error de conexión con el servidor: ' + err.message);
       } finally {
         btn.disabled = false;
       }
@@ -597,7 +622,7 @@
           cerrarModalDevolucion();
           cargarVentasMovil();
         } else {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           alert(errData.error || 'Error al registrar la devolución.');
         }
       } catch (e) {
@@ -615,3 +640,4 @@
   </script>
 </body>
 </html>
+m
