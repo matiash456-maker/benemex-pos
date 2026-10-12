@@ -321,9 +321,15 @@
       font-weight: bold;
       cursor: pointer;
     }
-    .btn-dev-action:disabled {
-      background-color: #94a3b8 !important;
-      opacity: 0.6;
+
+    .btn-dev-disabled {
+      background-color: #cbd5e1;
+      color: #64748b;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: bold;
       cursor: not-allowed;
     }
 
@@ -388,7 +394,7 @@
     <div class="header-title">
       <span>📱 BENEMEX POS</span>
     </div>
-    <span class="status-badge">🟢 Online</span>
+    <span class="status-badge" id="net-status">🟢 Sincronizado</span>
   </header>
 
   <div id="toast" class="toast"></div>
@@ -531,8 +537,8 @@
     let metodoDevolucionSeleccionado = 'Efectivo';
     let ventaParaDevolver = null;
     let html5QrCode = null;
+    let syncTimer = null;
 
-    // PERSISTENCIA DE CONTRASEÑA Y SERVICE WORKER
     window.addEventListener('DOMContentLoaded', () => {
       if (localStorage.getItem('benemex_app_auth') === 'true') {
         desbloquearApp();
@@ -540,13 +546,6 @@
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
       }
-
-      // Sincronización continua cada 12 segundos con el backend de Render / PC
-      setInterval(() => {
-        if (localStorage.getItem('benemex_app_auth') === 'true') {
-          cargarDatosIniciales();
-        }
-      }, 12000);
     });
 
     function verificarPassword() {
@@ -564,6 +563,32 @@
     function desbloquearApp() {
       document.getElementById('lock-screen').style.display = 'none';
       cargarDatosIniciales();
+      iniciarAutoSincronizacion();
+    }
+
+    // AUTO-SINCRONIZACIÓN CADA 5 SEGUNDOS
+    function iniciarAutoSincronizacion() {
+      if (syncTimer) clearInterval(syncTimer);
+      syncTimer = setInterval(() => {
+        sincronizarSilencioso();
+      }, 5000);
+    }
+
+    async function sincronizarSilencioso() {
+      try {
+        await obtenerTurnoActivo();
+        const resVentas = await fetch(`${API}/ventas`);
+        if (resVentas.ok) {
+          ventasCache = await resVentas.json();
+          if (document.getElementById('tab-historial').classList.contains('active')) {
+            renderizarHistorialVisual();
+          }
+        }
+        const resProds = await fetch(`${API}/productos`);
+        if (resProds.ok) {
+          productosCache = await resProds.json();
+        }
+      } catch (e) {}
     }
 
     function parseImg(url) {
@@ -573,20 +598,20 @@
     }
 
     async function obtenerTurnoActivo() {
-      try {
-        const endpoints = [`${API}/caja/estado`, `${API}/caja/turno-activo`, `${API}/caja`].map(url => fetch(url).catch(() => null));
-        const responses = await Promise.all(endpoints);
-        for (const res of responses) {
-          if (res && res.ok) {
+      const endpoints = ['/caja/estado', '/caja/actual', '/caja/turno', '/caja/turnos/activo'];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(`${API}${ep}`);
+          if (res.ok) {
             const data = await res.json();
-            const tId = data.turno_id || data.id || (data.turno && data.turno.id) || (data.caja && data.caja.turno_id);
-            if (tId) {
-              turnoActivoId = tId;
-              return tId;
+            const id = data.turno_id || data.id || (data.turno && data.turno.id);
+            if (id) {
+              turnoActivoId = id;
+              return id;
             }
           }
-        }
-      } catch(e) {}
+        } catch (e) {}
+      }
       return turnoActivoId;
     }
 
@@ -599,13 +624,8 @@
           fetch(`${API}/comisionados`).catch(() => null)
         ]);
 
-        if (resProds.ok) {
-          productosCache = await resProds.json();
-        }
-
-        if (resComis && resComis.ok) {
-          comisionadosCache = await resComis.json();
-        }
+        if (resProds.ok) productosCache = await resProds.json();
+        if (resComis && resComis.ok) comisionadosCache = await resComis.json();
 
         poblarComisionados();
         cargarHistorialVentas();
@@ -777,6 +797,7 @@
     }
 
     function abrirModalCobro() {
+      obtenerTurnoActivo();
       document.getElementById('modal-cobro').classList.add('active');
     }
 
@@ -793,7 +814,6 @@
       boxTr.style.display = (metodo === 'Transferencia') ? 'block' : 'none';
     }
 
-    // REGISTRO DE VENTA IMPACTANDO EN LA PC Y CAJA DE RENDER
     async function confirmarVentaMovil() {
       if (carrito.length === 0) return;
 
@@ -802,7 +822,7 @@
       const subtotal = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
       const comisionadoId = document.getElementById('cobro-comisionado').value || null;
       const comisionadoObj = comisionadosCache.find(c => String(c.id) === String(comisionadoId));
-      const vendedorNombre = comisionadoObj ? comisionadoObj.nombre : 'Venta Móvil';
+      const vendedorNombre = comisionadoObj ? comisionadoObj.nombre : 'Venta de Mostrador';
 
       const pagoEfectivo = metodoPagoSeleccionado === 'Efectivo' ? subtotal : 0;
       const pagoTransferencia = metodoPagoSeleccionado === 'Transferencia' ? subtotal : 0;
@@ -822,13 +842,12 @@
         pago_transferencia: pagoTransferencia,
         pago_qr: pagoQr,
         metodo_pago: metodoPagoSeleccionado,
-        pagos: { [metodoPagoSeleccionado]: subtotal },
+        pagos: JSON.stringify({ [metodoPagoSeleccionado]: subtotal }),
         total: subtotal,
         estado: 'completada',
         items: carrito.map(i => ({
           producto_id: i.id,
-          id: i.id,
-          codigo_barras: i.codigo_barras || '',
+          codigo_barras: i.codigo_barras,
           nombre: i.nombre,
           cantidad: i.cantidad,
           precio: i.precio,
@@ -856,7 +875,7 @@
           carrito = [];
           renderizarCarrito();
           cerrarModalCobro();
-          await cargarDatosIniciales();
+          sincronizarSilencioso();
         } else {
           showToast('❌ Error al procesar la venta');
         }
@@ -937,79 +956,85 @@
       document.getElementById('scanner-container').style.display = 'none';
     }
 
-    // GESTIÓN DE DEVOLUCIONES PERSISTENTES
-    function obtenerDevueltasGuardadas() {
-      try {
-        return JSON.parse(localStorage.getItem('benemex_devueltas_ids') || '[]');
-      } catch(e) {
-        return [];
-      }
-    }
-
-    function registrarDevueltaLocal(id) {
-      const ids = obtenerDevueltasGuardadas();
-      if (!ids.includes(id)) {
-        ids.push(id);
-        localStorage.setItem('benemex_devueltas_ids', JSON.stringify(ids));
-      }
-    }
-
-    // CARGA DE HISTORIAL SINCRO CON LA PC
     async function cargarHistorialVentas() {
-      const container = document.getElementById('historial-container');
       try {
         const res = await fetch(`${API}/ventas`);
         if (!res.ok) throw new Error();
         ventasCache = await res.json();
+        renderizarHistorialVisual();
+      } catch (err) {
+        document.getElementById('historial-container').innerHTML = '<p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar historial</p>';
+      }
+    }
 
-        if (ventasCache.length === 0) {
-          container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px;">No hay ventas registradas</p>';
-          return;
+    function renderizarHistorialVisual() {
+      const container = document.getElementById('historial-container');
+      if (!ventasCache || ventasCache.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px;">No hay ventas registradas</p>';
+        return;
+      }
+
+      const ultimas = ventasCache.slice(-30).reverse();
+      container.innerHTML = ultimas.map(v => {
+        let itemsList = v.items;
+        if (typeof itemsList === 'string') {
+          try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
         }
 
-        const devueltasLocales = obtenerDevueltasGuardadas();
-        const ultimas = ventasCache.slice(-30).reverse();
+        let itemsHtml = '';
+        if (itemsList && itemsList.length > 0) {
+          itemsHtml = itemsList.map(it => `• ${it.cantidad}x ${it.nombre || 'Prod'} (Cód: ${it.codigo_barras || '-'})`).join('<br>');
+        }
 
-        container.innerHTML = ultimas.map(v => {
-          let itemsHtml = '';
-          if (v.items && v.items.length > 0) {
-            itemsHtml = v.items.map(it => `• ${it.cantidad}x ${it.nombre || 'Prod'} (Cód: ${it.codigo_barras || '-'})`).join('<br>');
-          }
+        let medioPago = v.metodo_pago || 'Efectivo';
+        if (v.pago_transferencia > 0) medioPago = 'Transferencia';
+        else if (v.pago_tarjeta > 0) medioPago = 'Tarjeta';
+        else if (v.pago_qr > 0) medioPago = 'QR';
 
-          let medioPago = v.metodo_pago || 'Efectivo';
-          if (v.pago_transferencia > 0) medioPago = 'Transferencia';
-          else if (v.pago_tarjeta > 0) medioPago = 'Tarjeta';
-          else if (v.pago_qr > 0) medioPago = 'QR';
+        const esDevuelta = Boolean(
+          v.devuelta == 1 ||
+          v.devuelta === true ||
+          v.estado === 'Devuelto' ||
+          v.estado === 'devuelto' ||
+          v.estado === 'Cancelado' ||
+          v.estado === 'cancelado' ||
+          v.estado === 'Devolución'
+        );
 
-          const esDevuelta = v.estado === 'Devuelto' || v.estado === 'devolucion' || v.estado === 'Cancelado' || v.devuelta === 1 || devueltasLocales.includes(v.id);
-
-          return `
-            <div class="hist-card ${esDevuelta ? 'is-returned' : ''}">
-              <div class="hist-title">
-                <span>Venta #${v.id} - ${v.cliente_nombre || v.vendedor || 'Mostrador'}</span>
-                <span style="color:${esDevuelta ? '#e74c3c' : '#27ae60'};">
-                  ${esDevuelta ? '<span class="badge-devuelto-tag">DEVUELTA</span>' : `$${(v.total || 0).toFixed(2)}`}
-                </span>
-              </div>
-              <div class="hist-sub" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>📅 ${new Date(v.fecha || Date.now()).toLocaleString()} | 💳 ${medioPago}</span>
-                ${esDevuelta 
-                  ? `<button class="btn-dev-action" disabled style="opacity:0.5; background-color:#94a3b8; cursor:not-allowed;">Devuelta</button>`
-                  : `<button class="btn-dev-action" onclick="prepararDevolucion(${v.id})">↩️ Devolver</button>`
-                }
-              </div>
-              ${itemsHtml ? `<div class="hist-items-list">${itemsHtml}</div>` : ''}
+        return `
+          <div class="hist-card ${esDevuelta ? 'is-returned' : ''}">
+            <div class="hist-title">
+              <span>Venta #${v.id} - ${v.cliente_nombre || v.vendedor || 'Mostrador'}</span>
+              <span style="color:${esDevuelta ? '#e74c3c' : '#27ae60'};">
+                ${esDevuelta ? '<span class="badge-devuelto-tag">DEVUELTA</span>' : `$${(v.total || 0).toFixed(2)}`}
+              </span>
             </div>
-          `;
-        }).join('');
-      } catch (err) {
-        container.innerHTML = '<p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar historial</p>';
-      }
+            <div class="hist-sub" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>📅 ${new Date(v.fecha || Date.now()).toLocaleString()} | 💳 ${medioPago}</span>
+              ${esDevuelta 
+                ? `<button class="btn-dev-disabled" disabled>↩️ Devuelta</button>` 
+                : `<button class="btn-dev-action" onclick="prepararDevolucion(${v.id})">↩️ Devolver</button>`}
+            </div>
+            ${itemsHtml ? `<div class="hist-items-list">${itemsHtml}</div>` : ''}
+          </div>
+        `;
+      }).join('');
     }
 
     function prepararDevolucion(ventaId) {
       ventaParaDevolver = ventasCache.find(v => v.id === ventaId);
       if (!ventaParaDevolver) return;
+
+      const esDevuelta = Boolean(
+        ventaParaDevolver.devuelta == 1 ||
+        ventaParaDevolver.estado === 'Devuelto' ||
+        ventaParaDevolver.estado === 'devuelto'
+      );
+
+      if (esDevuelta) {
+        showToast('⚠️ Esta venta ya fue devuelta previamente');
+        return;
+      }
 
       document.getElementById('dev-info-venta').innerText = `Venta #${ventaParaDevolver.id} - Total a Reembolsar: $${parseFloat(ventaParaDevolver.total || 0).toFixed(2)}`;
       document.getElementById('dev-motivo-input').value = '';
@@ -1027,74 +1052,47 @@
       btn.classList.add('selected');
     }
 
+    // PROCESO ATÓMICO DE DEVOLUCIÓN MÓVIL
     async function confirmarDevolucionMovil() {
       if (!ventaParaDevolver) return;
 
-      const motivo = document.getElementById('dev-motivo-input').value.trim() || 'Devolución desde App Móvil';
+      await obtenerTurnoActivo();
+
+      const motivo = document.getElementById('dev-motivo-input').value.trim() || 'Devolución Móvil';
+      
+      let itemsList = ventaParaDevolver.items;
+      if (typeof itemsList === 'string') {
+        try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
+      }
+
       const devPayload = {
         venta_id: ventaParaDevolver.id,
+        turno_id: turnoActivoId,
+        monto: parseFloat(ventaParaDevolver.total || 0),
         metodo_pago: metodoDevolucionSeleccionado,
         motivo: motivo,
-        total: ventaParaDevolver.total,
-        items: ventaParaDevolver.items || []
+        items: itemsList || []
       };
 
       try {
-        let res = await fetch(`${API}/devoluciones`, {
+        const res = await fetch(`${API}/devoluciones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(devPayload)
         });
 
-        if (!res.ok) {
-          res = await fetch(`${API}/ventas/${ventaParaDevolver.id}/devolucion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(devPayload)
-          });
-        }
-
-        if (!res.ok) {
-          await fetch(`${API}/ventas/${ventaParaDevolver.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ estado: 'Devuelto', devuelta: 1, motivo: motivo })
-          }).catch(() => {});
-        }
-
-        // Reingreso garantizado de stock
-        if (ventaParaDevolver.items && ventaParaDevolver.items.length > 0) {
-          for (const item of ventaParaDevolver.items) {
-            const pId = item.producto_id || item.id;
-            if (pId) {
-              await fetch(`${API}/productos/reingreso`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  producto_id: parseInt(pId),
-                  cantidad: item.cantidad,
-                  detalle: `Devolución Venta #${ventaParaDevolver.id}: ${motivo}`
-                })
-              }).catch(() => {});
-            }
-          }
-        }
-
-        // Guardar la inhabilitación localmente para no permitir re-procesar
-        registrarDevueltaLocal(ventaParaDevolver.id);
+        // Marcar localmente como devuelta
+        ventaParaDevolver.devuelta = 1;
+        ventaParaDevolver.estado = 'Devuelto';
 
         showToast('✅ Devolución registrada y stock restaurado');
         cerrarModalDevolucion();
-        await cargarDatosIniciales();
+        sincronizarSilencioso();
       } catch (e) {
-        registrarDevueltaLocal(ventaParaDevolver.id);
-        showToast('✅ Devolución procesada');
-        cerrarModalDevolucion();
-        await cargarDatosIniciales();
+        showToast('❌ Error de conexión al procesar devolución');
       }
     }
 
-    // RESUMEN CONSOLIDADO PARA WHATSAPP
     function enviarResumenHistorialWhatsApp() {
       if (!ventasCache || ventasCache.length === 0) {
         showToast('No hay registros en el historial para resumir');
@@ -1102,10 +1100,8 @@
       }
 
       const fechaHoy = new Date().toLocaleDateString();
-      const devueltasLocales = obtenerDevueltasGuardadas();
-
-      const ventasEfectivas = ventasCache.filter(v => v.estado !== 'Devuelto' && v.devuelta !== 1 && v.estado !== 'Cancelado' && !devueltasLocales.includes(v.id));
-      const devoluciones = ventasCache.filter(v => v.estado === 'Devuelto' || v.devuelta === 1 || v.estado === 'Cancelado' || devueltasLocales.includes(v.id));
+      const ventasEfectivas = ventasCache.filter(v => v.estado !== 'Devuelto' && v.devuelta !== 1 && v.estado !== 'Cancelado');
+      const devoluciones = ventasCache.filter(v => v.estado === 'Devuelto' || v.devuelta === 1 || v.estado === 'Cancelado');
 
       let totalVendido = 0;
       let totalDevuelto = 0;
@@ -1128,8 +1124,13 @@
         texto += `• *Venta #${v.id}* - $${monto.toFixed(2)} (${v.cliente_nombre || v.vendedor || 'Mostrador'})\n`;
         texto += `  💳 ${medios.join(', ') || v.metodo_pago || 'Efectivo'}\n`;
 
-        if (v.items && v.items.length > 0) {
-          v.items.forEach(it => {
+        let itemsList = v.items;
+        if (typeof itemsList === 'string') {
+          try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
+        }
+
+        if (itemsList && itemsList.length > 0) {
+          itemsList.forEach(it => {
             texto += `  📦 ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
           });
         }
@@ -1145,8 +1146,14 @@
           totalDevuelto += montoDev;
 
           texto += `• *Devolución Venta #${v.id}* - -$${montoDev.toFixed(2)}\n`;
-          if (v.items && v.items.length > 0) {
-            v.items.forEach(it => {
+
+          let itemsList = v.items;
+          if (typeof itemsList === 'string') {
+            try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
+          }
+
+          if (itemsList && itemsList.length > 0) {
+            itemsList.forEach(it => {
               texto += `  📦 Restaurado: ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
             });
           }
