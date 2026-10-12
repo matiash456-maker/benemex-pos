@@ -75,7 +75,7 @@ async function registrarVentaDesdePedido(pedidoId) {
 
   const totalFinal = (p.sena_efectivo||0) + (p.sena_tarjeta||0) + (p.sena_transferencia||0) + (p.sena_qr||0);
   const vRes = await db.execute({
-    sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id, estado, devuelta, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "completada", 0, DATETIME("now", "localtime"))',
+    sql: "INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id, estado, devuelta, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', 0, DATETIME('now', 'localtime'))",
     args: [p.subtotal, p.descuento, p.sena_efectivo, p.sena_tarjeta, p.sena_transferencia, p.sena_qr, totalFinal, p.cliente_nombre, p.comisionado_id || null]
   });
   const ventaId = Number(vRes.lastInsertRowid);
@@ -208,7 +208,7 @@ app.post('/api/productos', async (req, res) => {
   const prodId = Number(pRes.rows[0].id);
 
   await db.execute({
-    sql: 'INSERT INTO historial_stock (producto_id, producto_nombre, categoria, cantidad, tipo, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+    sql: "INSERT INTO historial_stock (producto_id, producto_nombre, categoria, cantidad, tipo, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
     args: [prodId, nombre, categoria||'Hogar', stock, 'Alta / Creación', 'Registro inicial de producto']
   });
 
@@ -223,7 +223,7 @@ app.post('/api/productos/reingreso', async (req, res) => {
 
   await db.execute({ sql: 'UPDATE productos SET stock = stock + ? WHERE id = ?', args: [cantidad, producto_id] });
   await db.execute({
-    sql: 'INSERT INTO historial_stock (producto_id, producto_nombre, categoria, cantidad, tipo, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+    sql: "INSERT INTO historial_stock (producto_id, producto_nombre, categoria, cantidad, tipo, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
     args: [producto_id, p.nombre, p.categoria, cantidad, 'Reingreso Stock', detalle || 'Reingreso manual de mercadería']
   });
 
@@ -256,7 +256,7 @@ app.put('/api/productos/:id', async (req, res) => {
 
   if (diff !== 0) {
     await db.execute({
-      sql: 'INSERT INTO historial_stock (producto_id, producto_nombre, categoria, cantidad, tipo, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+      sql: "INSERT INTO historial_stock (producto_id, producto_nombre, categoria, cantidad, tipo, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
       args: [req.params.id, nombre, categoria, diff, 'Edición Manual', diff > 0 ? `Aumento manual (+${diff})` : `Disminución manual (${diff})`]
     });
   }
@@ -320,7 +320,7 @@ app.get('/api/comisiones/pagos', async (req, res) => {
 app.post('/api/comisiones/pagos', async (req, res) => {
   const { comisionado_id, monto, metodo_pago, tipo } = req.body;
   await db.execute({
-    sql: 'INSERT INTO pagos_comisiones (comisionado_id, monto, metodo_pago, tipo, fecha) VALUES (?, ?, ?, ?, DATETIME("now", "localtime"))',
+    sql: "INSERT INTO pagos_comisiones (comisionado_id, monto, metodo_pago, tipo, fecha) VALUES (?, ?, ?, ?, DATETIME('now', 'localtime'))",
     args: [comisionado_id, monto, metodo_pago, tipo]
   });
   res.json({ mensaje: 'Pago de comisión asentado' });
@@ -374,7 +374,7 @@ app.post('/api/ventas', async (req, res) => {
     const tot = parseFloat(total) || (sub - desc);
 
     const vRes = await db.execute({
-      sql: 'INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id, estado, devuelta, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "completada", 0, DATETIME("now", "localtime"))',
+      sql: "INSERT INTO ventas (subtotal, descuento, pago_efectivo, pago_tarjeta, pago_transferencia, pago_qr, total, cliente_nombre, comisionado_id, estado, devuelta, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', 0, DATETIME('now', 'localtime'))",
       args: [sub, desc, ef, ta, tr, qr, tot, clienteFinal, comisionado_id || null]
     });
     const ventaId = Number(vRes.lastInsertRowid);
@@ -436,7 +436,7 @@ app.post('/api/ventas/:id/modificar-cantidad', async (req, res) => {
     
     const metReembolsoStr = formatMetodoReembolso(metodo_reembolso);
     await db.execute({
-      sql: 'INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+      sql: "INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
       args: [v.id, det.producto_id, det.nombre, det.imagen, cantDev, det.precio_unitario, devMonto, `Venta - ${v.cliente_nombre}`, metReembolsoStr]
     });
   }
@@ -485,7 +485,7 @@ app.post('/api/ventas/:id/agregar-item', async (req, res) => {
   const nuevosItems = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [req.params.id] })).rows;
   const nuevoSubtotal = nuevosItems.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
   const nuevoTotal = Math.max(0, nuevoSubtotal - v.descuento);
-  await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ?, estado = "completada", devuelta = 0 WHERE id = ?', args: [nuevoSubtotal, nuevoTotal, req.params.id] });
+  await db.execute({ sql: "UPDATE ventas SET subtotal = ?, total = ?, estado = 'completada', devuelta = 0 WHERE id = ?", args: [nuevoSubtotal, nuevoTotal, req.params.id] });
 
   res.json({ mensaje: 'Ítem agregado a venta' });
 });
@@ -496,7 +496,6 @@ app.post('/api/ventas/:id/devolver-total', async (req, res) => {
   const v = vRes.rows[0];
   if (!v) return res.status(404).json({ mensaje: 'Venta no encontrada' });
 
-  // VALIDACIÓN DE SEGURIDAD CONTRA DEVOLUCIÓN DUPLICADA
   if (v.devuelta === 1 || v.estado === 'Devuelto') {
     return res.status(400).json({ error: 'Esta venta ya fue devuelta anteriormente.' });
   }
@@ -507,7 +506,7 @@ app.post('/api/ventas/:id/devolver-total', async (req, res) => {
   for (const i of itemsRes.rows) {
     await db.execute({ sql: 'UPDATE productos SET stock = stock + ? WHERE id = ?', args: [i.cantidad, i.producto_id] });
     await db.execute({
-      sql: 'INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+      sql: "INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
       args: [v.id, i.producto_id, i.nombre, i.imagen, i.cantidad, i.precio_unitario, i.cantidad * i.precio_unitario, `Venta - ${v.cliente_nombre}`, metReembolsoStr]
     });
   }
@@ -547,7 +546,6 @@ app.post('/api/devoluciones', async (req, res) => {
   const { venta_id, turno_id, monto, metodo_pago, motivo, items } = req.body;
 
   try {
-    // 1. Verificar si la venta existe y si ya fue devuelta previamente
     const vRes = await db.execute({ sql: 'SELECT * FROM ventas WHERE id = ?', args: [venta_id] });
     const ventaObj = vRes.rows[0];
     if (!ventaObj) {
@@ -557,13 +555,11 @@ app.post('/api/devoluciones', async (req, res) => {
       return res.status(400).json({ error: 'Atención: Esta venta ya fue devuelta previamente. Se canceló la duplicación.' });
     }
 
-    // 2. Marcar la venta como devuelta inmediatamente
     await db.execute({
       sql: "UPDATE ventas SET estado = 'Devuelto', devuelta = 1 WHERE id = ?",
       args: [venta_id]
     });
 
-    // 3. Reingresar el stock de cada producto devuelto
     let itemsArray = items;
     if (typeof itemsArray === 'string') {
       try { itemsArray = JSON.parse(itemsArray); } catch(e) { itemsArray = []; }
@@ -581,7 +577,6 @@ app.post('/api/devoluciones', async (req, res) => {
         }
       }
     } else {
-      // Reingreso por fallback si no venían items explícitos
       const detRes = await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [venta_id] });
       for (const d of detRes.rows) {
         await db.execute({
@@ -591,7 +586,6 @@ app.post('/api/devoluciones', async (req, res) => {
       }
     }
 
-    // 4. Registrar transacción en historial_devoluciones
     const clienteNombre = ventaObj.cliente_nombre || 'App Móvil';
     const metStr = formatMetodoReembolso(metodo_pago);
     const motivoTexto = motivo || 'Devolución App Móvil';
@@ -605,15 +599,13 @@ app.post('/api/devoluciones', async (req, res) => {
         const imgP = item.imagen || '';
 
         await db.execute({
-          sql: `INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))`,
+          sql: "INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
           args: [venta_id, prodId || null, nombreP, imgP, cant, precioU, cant * precioU, `App Móvil (${motivoTexto}) - ${clienteNombre}`, metStr]
         });
       }
     } else {
       await db.execute({
-        sql: `INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))`,
+        sql: "INSERT INTO historial_devoluciones (venta_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
         args: [venta_id, null, `Devolución (${motivoTexto})`, '', 1, monto || ventaObj.total, monto || ventaObj.total, `App Móvil - ${clienteNombre}`, metStr]
       });
     }
@@ -633,7 +625,7 @@ app.get('/api/egresos', async (req, res) => {
 
 app.post('/api/egresos', async (req, res) => { 
   await db.execute({
-    sql: 'INSERT INTO egresos (categoria, concepto, monto, metodo_pago, tipo, fecha) VALUES (?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+    sql: "INSERT INTO egresos (categoria, concepto, monto, metodo_pago, tipo, fecha) VALUES (?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
     args: [req.body.categoria, req.body.concepto, req.body.monto, req.body.metodo_pago, 'gasto']
   });
   res.json({ mensaje: 'Egreso guardado' }); 
@@ -671,7 +663,7 @@ app.post('/api/pedidos', async (req, res) => {
   
   const pRes = await db.execute({
     sql: `INSERT INTO pedidos (codigo_pedido, cliente_nombre, cliente_telefono, cliente_dni, subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia, localidad, codigo_postal, tipo_direccion, direccion_domicilio, transporte, tracking, estado, observacion, comisionado_id, fecha) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))`,
     args: [codigo_pedido||'', cliente, tel||'', dni||'', subtotal, descuento, base_sena, sena_efectivo, sena_tarjeta, sena_transferencia, sena_qr, saldo_pendiente, tipo_entrega, provincia||'', localidad||'', codigo_postal||'', tipo_direccion||'sucursal', direccion_domicilio||'', transporte||'', tracking||'', estadoInicial, obs, comisionado_id || null]
   });
   
@@ -679,7 +671,7 @@ app.post('/api/pedidos', async (req, res) => {
 
   if (tipo_entrega === 'salta' && uber_pago === 'pagado') {
     await db.execute({
-      sql: 'INSERT INTO egresos (categoria, concepto, monto, metodo_pago, tipo, fecha) VALUES (?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+      sql: "INSERT INTO egresos (categoria, concepto, monto, metodo_pago, tipo, fecha) VALUES (?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
       args: ['Logística y Fletes', `Flete Uber (Pedido: ${cliente})`, uber_costo || 0, uber_metodo || 'efectivo', 'gasto']
     });
   }
@@ -821,7 +813,7 @@ app.delete('/api/pedidos/:id', async (req, res) => {
     const metStr = formatMetodoReembolso(metodo_reembolso);
     for (const d of detallesRes.rows) {
       await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+        sql: "INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
         args: [p.id, d.producto_id, d.nombre, d.imagen, d.cantidad, d.precio_unitario, d.cantidad * d.precio_unitario, origenD, metStr]
       });
     }
@@ -829,7 +821,7 @@ app.delete('/api/pedidos/:id', async (req, res) => {
     const origenD = `Pedido Cancelado - ${p.cliente_nombre}`;
     const metStr = formatMetodoReembolso(metodo_reembolso);
     await db.execute({
-      sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+      sql: "INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
       args: [p.id, null, 'Pedido: Cancelado Totalmente', '', 1, totalSenaPagada, totalSenaPagada, origenD, metStr]
     });
   }
@@ -859,7 +851,7 @@ app.post('/api/pedidos/:id/modificar-cantidad', async (req, res) => {
       const devMonto = cantDev * det.precio_unitario;
       const metStr = formatMetodoReembolso(metodo_reembolso);
       await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+        sql: "INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
         args: [req.params.id, det.producto_id, det.nombre, det.imagen, cantDev, det.precio_unitario, devMonto, `Pedido - ${det.cliente_nombre}`, metStr]
       });
     }
@@ -895,7 +887,7 @@ app.post('/api/pedidos/:id/modificar-cantidad', async (req, res) => {
     if (totalSenaPagada > 0) {
       const metStr = formatMetodoReembolso(metodo_reembolso);
       await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+        sql: "INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
         args: [req.params.id, null, 'Pedido Cancelado Totalmente', '', 1, totalSenaPagada, totalSenaPagada, `Pedido Cancelado - ${ped.cliente_nombre}`, metStr]
       });
     }
@@ -913,7 +905,7 @@ app.post('/api/pedidos/:id/modificar-cantidad', async (req, res) => {
       const excedenteBase = Math.abs(nuevoSaldo);
       const metStr = formatMetodoReembolso(metodo_reembolso);
       await db.execute({
-        sql: 'INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"))',
+        sql: "INSERT INTO historial_devoluciones (pedido_id, producto_id, producto_nombre, producto_imagen, cantidad, precio_unitario, monto_devuelto, origen, detalle_pago, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))",
         args: [req.params.id, null, 'Excedente de Seña Reintegrado', '', 1, excedenteBase, excedenteBase, `Pedido - ${ped.cliente_nombre}`, metStr]
       });
 
@@ -991,7 +983,7 @@ app.post('/api/pedidos/:id/agregar-item', async (req, res) => {
     }
     const nuevosDetV = (await db.execute({ sql: 'SELECT * FROM detalle_ventas WHERE venta_id = ?', args: [ped.venta_id] })).rows;
     const nuevoSubV = nuevosDetV.reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    await db.execute({ sql: 'UPDATE ventas SET subtotal = ?, total = ?, estado = "completada", devuelta = 0 WHERE id = ?', args: [nuevoSubV, Math.max(0, nuevoSubV - ped.descuento), ped.venta_id] });
+    await db.execute({ sql: "UPDATE ventas SET subtotal = ?, total = ?, estado = 'completada', devuelta = 0 WHERE id = ?", args: [nuevoSubV, Math.max(0, nuevoSubV - ped.descuento), ped.venta_id] });
   }
 
   const nuevosDet = (await db.execute({ sql: 'SELECT * FROM detalle_pedidos WHERE pedido_id = ?', args: [req.params.id] })).rows;
