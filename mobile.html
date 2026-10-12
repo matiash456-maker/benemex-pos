@@ -3,857 +3,251 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>BENEMEX POS Móvil</title>
-  
-  <meta name="theme-color" content="#2c3e50">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="logo-home-cut.jpg">
-  <link rel="manifest" href="manifest.json">
-
-  <!-- Lector de código de barras por cámara -->
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
+  <title>POS Móvil - BENEMEX</title>
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { background-color: #f4f6f9; color: #333; padding-bottom: 70px; user-select: none; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f0f2f5; color: #1c1e21; padding-bottom: 70px; }
+    
+    header { background-color: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    header h1 { font-size: 1.2rem; }
+    
+    .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #ccc; z-index: 1000; height: 60px; }
+    .nav-btn { flex: 1; border: none; background: transparent; font-size: 0.75rem; font-weight: bold; color: #606770; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; }
+    .nav-btn.active { color: #2980b9; background-color: #eaf2f8; }
+    .nav-btn span { font-size: 1.2rem; }
 
-    /* PANTALLA DE BLOQUEO PERMANENTE */
-    .lock-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #1e293b;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .lock-card {
-      background: white;
-      width: 100%;
-      max-width: 360px;
-      border-radius: 16px;
-      padding: 25px;
-      text-align: center;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    }
-    .lock-icon { font-size: 3rem; margin-bottom: 10px; }
-    .lock-card h2 { font-size: 1.3rem; color: #2c3e50; margin-bottom: 6px; }
-    .lock-card p { font-size: 0.85rem; color: #64748b; margin-bottom: 18px; }
+    .container { padding: 12px; display: none; }
+    .container.active { display: block; }
 
-    header {
-      background-color: #2c3e50;
-      color: white;
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-    .header-title { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .status-badge { font-size: 0.75rem; padding: 4px 8px; border-radius: 12px; font-weight: 600; background-color: #27ae60; color: white; }
+    .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card h2 { font-size: 1.1rem; margin-bottom: 10px; color: #2c3e50; }
 
-    nav.bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 60px;
-      background: white;
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      border-top: 1px solid #e0e0e0;
-      z-index: 100;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-    }
-    .nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #7f8c8d;
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-decoration: none;
-      width: 50%;
-      height: 100%;
-      border: none;
-      background: none;
-      cursor: pointer;
-    }
-    .nav-item.active { color: #2c3e50; border-top: 3px solid #2c3e50; }
-    .nav-icon { font-size: 1.3rem; margin-bottom: 2px; }
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; color: #4b4f56; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ccd0d5; border-radius: 6px; font-size: 1rem; }
 
-    .tab-content { display: none; padding: 15px; }
-    .tab-content.active { display: block; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; color: white; margin-top: 5px; }
+    .btn-primary { background-color: #2980b9; }
+    .btn-success { background-color: #27ae60; }
+    .btn-danger { background-color: #e74c3c; }
+    .btn-warning { background-color: #f39c12; }
+    .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
 
-    .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
-    .input-field {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 1rem;
-      background-color: white;
-      outline: none;
-    }
-    .input-field:focus { border-color: #2c3e50; }
-    .btn-icon {
-      background-color: #2c3e50;
-      color: white;
-      border: none;
-      padding: 0 16px;
-      border-radius: 8px;
-      font-size: 1.2rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
+    .item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f2f5; }
+    .item-info { flex: 1; }
+    .item-title { font-weight: bold; font-size: 0.95rem; }
+    .item-sub { font-size: 0.8rem; color: #606770; }
 
-    .prod-search-results {
-      max-height: 280px;
-      overflow-y: auto;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.08);
-      margin-bottom: 15px;
-      display: none;
-    }
-    .prod-item-row {
-      padding: 10px 12px;
-      border-bottom: 1px solid #f1f5f9;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .prod-item-row:last-child { border-bottom: none; }
-    .prod-img-thumb {
-      width: 45px;
-      height: 45px;
-      object-fit: cover;
-      border-radius: 6px;
-      background-color: #eef2f5;
-      flex-shrink: 0;
-    }
-    .prod-info-title { font-weight: 600; font-size: 0.92rem; color: #1e293b; }
-    .prod-info-sub { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
-    .btn-add-mini {
-      background-color: #27ae60;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 0.85rem;
-      margin-left: auto;
-      flex-shrink: 0;
-    }
+    .badge { padding: 3px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: white; display: inline-block; }
+    .badge-devueltas { background-color: #e74c3c; }
+    .badge-ok { background-color: #27ae60; }
 
-    .cart-card {
-      background: white;
-      border-radius: 10px;
-      padding: 15px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-      margin-bottom: 15px;
-    }
-    .cart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #e2e8f0;
-      margin-bottom: 10px;
-      font-weight: 700;
-      color: #334155;
-    }
-    .cart-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 0;
-      border-bottom: 1px dashed #e2e8f0;
-    }
-    .cart-item:last-child { border-bottom: none; }
-    .cart-item-details { flex: 1; }
-    .cart-item-title { font-size: 0.9rem; font-weight: 600; color: #1e293b; }
-    .cart-item-code { font-size: 0.75rem; color: #64748b; }
-    .cart-item-price { font-size: 0.82rem; color: #2980b9; font-weight: bold; margin-top: 2px; }
-    .cart-controls { display: flex; align-items: center; gap: 6px; }
-    .btn-qty {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
-      font-weight: bold;
-      font-size: 1.1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .cart-qty-num { font-weight: bold; font-size: 0.95rem; width: 22px; text-align: center; }
-    .btn-del-item { color: #e74c3c; border: none; background: none; font-size: 1.1rem; margin-left: 2px; }
+    .sug-box { background: white; border: 1px solid #ccc; max-height: 180px; overflow-y: auto; border-radius: 6px; margin-top: 2px; }
+    .sug-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
 
-    .checkout-summary {
-      background: white;
-      border-radius: 10px;
-      padding: 15px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
-    .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
-    .summary-total { font-size: 1.3rem; font-weight: 800; color: #2c3e50; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 8px; }
-
-    .btn-main-pay {
-      width: 100%;
-      background-color: #27ae60;
-      color: white;
-      border: none;
-      padding: 15px;
-      border-radius: 10px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      margin-top: 12px;
-      box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      cursor: pointer;
-    }
-    .btn-main-pay:disabled { background-color: #cbd5e1; box-shadow: none; cursor: not-allowed; }
-
-    .btn-whatsapp-summary {
-      width: 100%;
-      background-color: #25d366;
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: bold;
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      box-shadow: 0 2px 6px rgba(37, 211, 102, 0.3);
-      cursor: pointer;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      display: none;
-      align-items: flex-end;
-      justify-content: center;
-      z-index: 200;
-    }
-    .modal-overlay.active { display: flex; }
-    .modal-sheet {
-      background: white;
-      width: 100%;
-      max-width: 500px;
-      border-top-left-radius: 20px;
-      border-top-right-radius: 20px;
-      padding: 20px;
-      max-height: 90vh;
-      overflow-y: auto;
-      animation: slideUp 0.25s ease-out;
-    }
-    @keyframes slideUp {
-      from { transform: translateY(100%); }
-      to { transform: translateY(0); }
-    }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .modal-title { font-size: 1.2rem; font-weight: bold; color: #2c3e50; }
-    .btn-close-modal { background: none; border: none; font-size: 1.5rem; color: #64748b; }
-
-    .payment-methods-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-    .pay-btn-opt, .pay-dev-opt {
-      border: 1.5px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-      font-weight: 600;
-      background: #f8fafc;
-      color: #334155;
-    }
-    .pay-btn-opt.selected, .pay-dev-opt.selected {
-      border-color: #2c3e50;
-      background-color: #2c3e50;
-      color: white;
-    }
-
-    .hist-card {
-      background: white;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 10px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-    }
-    .hist-card.is-returned {
-      background: #fff5f5;
-      border-left: 4px solid #e74c3c;
-    }
-    .hist-title { font-weight: bold; font-size: 0.95rem; color: #2c3e50; display: flex; justify-content: space-between; align-items: center; }
-    .hist-sub { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
-    .hist-items-list { font-size: 0.8rem; color: #334155; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e2e8f0; }
-
-    .btn-dev-action {
-      background-color: #e74c3c;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .btn-dev-disabled {
-      background-color: #cbd5e1;
-      color: #64748b;
-      border: none;
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: bold;
-      cursor: not-allowed;
-    }
-
-    .badge-devuelto-tag {
-      background-color: #fadbd8;
-      color: #78281f;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: bold;
-    }
-
-    #scanner-container {
-      width: 100%;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 15px;
-      display: none;
-      background: #000;
-    }
-
-    .toast {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1e293b;
-      color: white;
-      padding: 10px 20px;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      display: none;
-      z-index: 300;
-    }
-
-    .file-upload-box {
-      border: 2px dashed #3498db;
-      background: #f0f9ff;
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-      margin-bottom: 15px;
-    }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; padding: 15px; }
+    .modal-content { background: white; border-radius: 10px; padding: 15px; width: 100%; max-width: 450px; max-height: 90vh; overflow-y: auto; }
   </style>
 </head>
 <body>
 
-  <!-- PANTALLA DE BLOQUEO PERMANENTE -->
-  <div id="lock-screen" class="lock-overlay">
-    <div class="lock-card">
-      <div class="lock-icon">🔒</div>
-      <h2>Acceso Restringido</h2>
-      <p>Ingresa la contraseña para habilitar la app:</p>
-      <input type="password" id="pass-input" class="input-field" placeholder="Contraseña..." onkeyup="if(event.key==='Enter') verificarPassword()">
-      <button class="btn-main-pay" style="margin-top: 15px;" onclick="verificarPassword()">Ingresar</button>
+  <header>
+    <h1>📱 BENEMEX POS Móvil</h1>
+  </header>
+
+  <!-- PESTAÑA: VENTAS -->
+  <div id="sec-ventas" class="container active">
+    <div class="card">
+      <h2>Nueva Venta Rápida</h2>
+      <div class="form-group" style="position:relative;">
+        <label>Buscar o Escanear Producto:</label>
+        <input type="text" id="m-buscar-prod" placeholder="Nombre o código de barras..." oninput="buscarProductos(this.value)">
+        <div id="m-sug-prod" class="sug-box" style="display:none;"></div>
+      </div>
+
+      <div id="m-carrito-lista" style="margin-top: 10px;">
+        <p style="text-align:center; color:#888; font-size:0.9rem;">El carrito está vacío</p>
+      </div>
+
+      <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+          <span>Cliente (Opcional):</span>
+          <input type="text" id="m-cliente" placeholder="Nombre" style="width:60%; padding:5px;">
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+          <span>Método de Pago:</span>
+          <select id="m-metodo-pago" style="width:60%; padding:5px;">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="qr">QR</option>
+          </select>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:1.2rem; font-weight:bold; margin-bottom:10px;">
+          <span>Total:</span>
+          <span id="m-cart-total" style="color:#27ae60;">$0.00</span>
+        </div>
+        <button id="m-btn-cobrar" class="btn btn-success" onclick="cobrarVentaMovil()">Cobrar Venta</button>
+      </div>
     </div>
   </div>
 
-  <header>
-    <div class="header-title">
-      <span>📱 BENEMEX POS</span>
-    </div>
-    <span class="status-badge" id="net-status">🟢 Sincronizado</span>
-  </header>
-
-  <div id="toast" class="toast"></div>
-
-  <!-- PESTAÑA VENTAS -->
-  <main id="tab-ventas" class="tab-content active">
-    <div class="search-box">
-      <input type="text" id="mob-search-input" class="input-field" placeholder="🔍 Buscar por nombre o código..." oninput="buscarProductosMovil()">
-      <button class="btn-icon" onclick="toggleCamaraScanner()" title="Escanear con Cámara">📷</button>
-    </div>
-
-    <div id="scanner-container">
-      <div id="reader" style="width: 100%;"></div>
-    </div>
-
-    <div id="mob-search-results" class="prod-search-results"></div>
-
-    <div class="cart-card">
-      <div class="cart-header">
-        <span>🛒 Carrito de Venta</span>
-        <span id="cart-item-count" style="font-size: 0.85rem; color: #64748b;">0 items</span>
+  <!-- PESTAÑA: HISTORIAL Y DEVOLUCIONES -->
+  <div id="sec-devoluciones" class="container">
+    <div class="card">
+      <h2>Ventas Recientes / Devoluciones</h2>
+      <div class="form-group">
+        <input type="text" id="m-buscar-venta" placeholder="Buscar venta por #ID o Cliente..." oninput="filtrarVentas(this.value)">
       </div>
-      <div id="cart-items-container">
-        <p style="text-align: center; color: #94a3b8; font-size: 0.9rem; padding: 15px;">No hay productos agregados</p>
+      <div id="m-lista-ventas">
+        <p style="text-align:center; color:#888;">Cargando ventas...</p>
       </div>
     </div>
+  </div>
 
-    <div class="checkout-summary">
-      <div class="summary-row summary-total">
-        <span>TOTAL</span>
-        <span id="lbl-total">$0.00</span>
+  <!-- MODAL DE PROCESAMIENTO DE DEVOLUCIÓN -->
+  <div id="modal-devolucion" class="modal">
+    <div class="modal-content">
+      <h2 style="margin-bottom:10px; color:#c0392b;">Procesar Devolución</h2>
+      <p id="m-dev-info-venta" style="font-size:0.85rem; color:#555; margin-bottom:10px;"></p>
+      
+      <div id="m-dev-items-lista" style="margin-bottom:15px;"></div>
+
+      <div class="form-group">
+        <label>Medio de Reembolso:</label>
+        <select id="m-dev-metodo">
+          <option value="efectivo">1. Efectivo</option>
+          <option value="transferencia">2. Transferencia</option>
+          <option value="tarjeta">3. Tarjeta</option>
+        </select>
       </div>
 
-      <button id="btn-abrir-cobro" class="btn-main-pay" onclick="abrirModalCobro()" disabled>
-        <span>💵 COBRAR</span>
-      </button>
-    </div>
-  </main>
+      <div class="form-group">
+        <label>Motivo de la Devolución:</label>
+        <input type="text" id="m-dev-motivo" placeholder="Ej: Producto fallado, cambio de opinión...">
+      </div>
 
-  <!-- PESTAÑA HISTORIAL -->
-  <main id="tab-historial" class="tab-content">
-    <button class="btn-whatsapp-summary" onclick="enviarResumenHistorialWhatsApp()">
-      💬 Enviar Resumen de Ventas y Devoluciones
+      <div style="display:flex; gap:10px; margin-top:15px;">
+        <button class="btn btn-danger" id="m-btn-confirmar-dev" onclick="confirmarDevolucionMovil()">Confirmar Devolución</button>
+        <button class="btn btn-warning" onclick="cerrarModalDevolucion()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA NAVEGACIÓN INFERIOR -->
+  <nav class="nav-bottom">
+    <button class="nav-btn active" onclick="cambiarSeccion('sec-ventas', this)">
+      <span>🛒</span>
+      Venta
     </button>
-
-    <h3 style="margin-bottom: 12px; color: #2c3e50;">📜 Historial del Día</h3>
-    <div id="historial-container">
-      <p style="text-align: center; color: #94a3b8; padding: 20px;">Cargando historial...</p>
-    </div>
-  </main>
-
-  <!-- NAVEGACIÓN INFERIOR -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" onclick="cambiarTab('tab-ventas', this)">
-      <span class="nav-icon">🛒</span>
-      <span>Venta</span>
-    </button>
-    <button class="nav-item" onclick="cambiarTab('tab-historial', this)">
-      <span class="nav-icon">📜</span>
-      <span>Historial</span>
+    <button class="nav-btn" onclick="cambiarSeccion('sec-devoluciones', this); cargarVentasMovil();">
+      <span>🔄</span>
+      Devoluciones
     </button>
   </nav>
 
-  <!-- MODAL DE COBRO -->
-  <div id="modal-cobro" class="modal-overlay">
-    <div class="modal-sheet">
-      <div class="modal-header">
-        <span class="modal-title">Finalizar Venta</span>
-        <button class="btn-close-modal" onclick="cerrarModalCobro()">&times;</button>
-      </div>
-
-      <label style="font-size: 0.85rem; font-weight: bold; color: #475569;">Vendedor / Comisionado:</label>
-      <select id="cobro-comisionado" class="input-field" style="margin-top: 5px; margin-bottom: 15px;"></select>
-
-      <label style="font-size: 0.85rem; font-weight: bold; color: #475569; display: block; margin-bottom: 8px;">Método de Pago:</label>
-      <div class="payment-methods-grid">
-        <div class="pay-btn-opt selected" onclick="seleccionarMetodoPago('Efectivo', this)">💵 Efectivo</div>
-        <div class="pay-btn-opt" onclick="seleccionarMetodoPago('Transferencia', this)">📲 Transfer.</div>
-        <div class="pay-btn-opt" onclick="seleccionarMetodoPago('Tarjeta', this)">💳 Tarjeta</div>
-        <div class="pay-btn-opt" onclick="seleccionarMetodoPago('QR', this)">📱 QR</div>
-      </div>
-
-      <div id="box-adjunto-transferencia" class="file-upload-box" style="display: none;">
-        <label style="font-size: 0.85rem; font-weight: bold; color: #1d4ed8; display: block; margin-bottom: 6px;">
-          📷 Sacar foto al Comprobante de Transferencia:
-        </label>
-        <input type="file" id="foto-comprobante-input" accept="image/*" capture="environment" class="input-field">
-        <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 4px;">Al registrar, se abrirá WhatsApp con el resumen y la foto para enviar al grupo.</small>
-      </div>
-
-      <div class="summary-row summary-total" style="border-top: 1px solid #e2e8f0; padding-top: 10px;">
-        <span>A Cobrar:</span>
-        <span id="modal-total-final">$0.00</span>
-      </div>
-
-      <button class="btn-main-pay" onclick="confirmarVentaMovil()" style="margin-top: 15px;">
-        ✅ REGISTRAR VENTA
-      </button>
-    </div>
-  </div>
-
-  <!-- MODAL DE DEVOLUCIÓN -->
-  <div id="modal-devolucion" class="modal-overlay">
-    <div class="modal-sheet">
-      <div class="modal-header">
-        <span class="modal-title">↩️ Procesar Devolución</span>
-        <button class="btn-close-modal" onclick="cerrarModalDevolucion()">&times;</button>
-      </div>
-
-      <p id="dev-info-venta" style="font-size: 0.9rem; color: #1e293b; margin-bottom: 12px; font-weight: 600;"></p>
-
-      <label style="font-size: 0.85rem; font-weight: bold; color: #475569; display: block; margin-bottom: 8px;">Método para devolver el dinero:</label>
-      <div class="payment-methods-grid">
-        <div class="pay-dev-opt selected" onclick="seleccionarMetodoDevolucion('Efectivo', this)">💵 Efectivo</div>
-        <div class="pay-dev-opt" onclick="seleccionarMetodoDevolucion('Transferencia', this)">📲 Transfer.</div>
-        <div class="pay-dev-opt" onclick="seleccionarMetodoDevolucion('Tarjeta', this)">💳 Tarjeta</div>
-        <div class="pay-dev-opt" onclick="seleccionarMetodoDevolucion('QR', this)">📱 QR</div>
-      </div>
-
-      <label style="font-size: 0.85rem; font-weight: bold; color: #475569; display: block; margin-top: 10px;">Motivo de la Devolución:</label>
-      <input type="text" id="dev-motivo-input" class="input-field" placeholder="Ej: Error de tipeo / Cambio de producto" style="margin-top: 5px; margin-bottom: 15px;">
-
-      <button class="btn-main-pay" style="background-color: #e74c3c;" onclick="confirmarDevolucionMovil()">
-        ↩️ CONFIRMAR DEVOLUCIÓN Y RESTAURAR STOCK
-      </button>
-    </div>
-  </div>
-
   <script>
     const API = 'https://benemex-pos.onrender.com/api';
-    const TELEFONO_WHATSAPP = '5493874642295';
-    const CONTRASEÑA_ACCESO = 'ricardo108';
-    
-    let productosCache = [];
-    let comisionadosCache = [];
-    let ventasCache = [];
-    let carrito = [];
-    let turnoActivoId = null;
-    let metodoPagoSeleccionado = 'Efectivo';
-    let metodoDevolucionSeleccionado = 'Efectivo';
-    let ventaParaDevolver = null;
-    let html5QrCode = null;
-    let syncTimer = null;
+    let carritoMovil = [];
+    let ventasCargadas = [];
+    let ventaSeleccionadaDev = null;
 
-    window.addEventListener('DOMContentLoaded', () => {
-      if (localStorage.getItem('benemex_app_auth') === 'true') {
-        desbloquearApp();
-      }
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
-      }
-    });
-
-    function verificarPassword() {
-      const input = document.getElementById('pass-input').value;
-      if (input === CONTRASEÑA_ACCESO) {
-        localStorage.setItem('benemex_app_auth', 'true');
-        desbloquearApp();
-      } else {
-        showToast('❌ Contraseña incorrecta');
-        document.getElementById('pass-input').value = '';
-        document.getElementById('pass-input').focus();
-      }
-    }
-
-    function desbloquearApp() {
-      document.getElementById('lock-screen').style.display = 'none';
-      cargarDatosIniciales();
-      iniciarAutoSincronizacion();
-    }
-
-    // AUTO-SINCRONIZACIÓN CADA 5 SEGUNDOS
-    function iniciarAutoSincronizacion() {
-      if (syncTimer) clearInterval(syncTimer);
-      syncTimer = setInterval(() => {
-        sincronizarSilencioso();
-      }, 5000);
-    }
-
-    async function sincronizarSilencioso() {
-      try {
-        await obtenerTurnoActivo();
-        const resVentas = await fetch(`${API}/ventas`);
-        if (resVentas.ok) {
-          ventasCache = await resVentas.json();
-          if (document.getElementById('tab-historial').classList.contains('active')) {
-            renderizarHistorialVisual();
-          }
-        }
-        const resProds = await fetch(`${API}/productos`);
-        if (resProds.ok) {
-          productosCache = await resProds.json();
-        }
-      } catch (e) {}
-    }
-
-    function parseImg(url) {
-      if (!url) return '';
-      const match = url.match(/[-\w]{25,}/);
-      return match ? `https://lh3.googleusercontent.com/d/${match[0]}` : url;
-    }
-
-    async function obtenerTurnoActivo() {
-      const endpoints = ['/caja/estado', '/caja/actual', '/caja/turno', '/caja/turnos/activo'];
-      for (const ep of endpoints) {
-        try {
-          const res = await fetch(`${API}${ep}`);
-          if (res.ok) {
-            const data = await res.json();
-            const id = data.turno_id || data.id || (data.turno && data.turno.id);
-            if (id) {
-              turnoActivoId = id;
-              return id;
-            }
-          }
-        } catch (e) {}
-      }
-      return turnoActivoId;
-    }
-
-    async function cargarDatosIniciales() {
-      try {
-        await obtenerTurnoActivo();
-
-        const [resProds, resComis] = await Promise.all([
-          fetch(`${API}/productos`),
-          fetch(`${API}/comisionados`).catch(() => null)
-        ]);
-
-        if (resProds.ok) productosCache = await resProds.json();
-        if (resComis && resComis.ok) comisionadosCache = await resComis.json();
-
-        poblarComisionados();
-        cargarHistorialVentas();
-      } catch (err) {
-        showToast('Error de conexión');
-      }
-    }
-
-    function cambiarTab(tabId, btn) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-
-      document.getElementById(tabId).classList.add('active');
+    function cambiarSeccion(secId, btn) {
+      document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(secId).classList.add('active');
       btn.classList.add('active');
-
-      if (tabId === 'tab-historial') cargarHistorialVentas();
-      if (html5QrCode) detenerScanner();
     }
 
-    function buscarProductosMovil() {
-      const q = document.getElementById('mob-search-input').value.toLowerCase().trim();
-      const resultsContainer = document.getElementById('mob-search-results');
-
-      if (!q) {
-        resultsContainer.style.display = 'none';
-        return;
+    // BUSCADOR Y CARRITO MÓVIL
+    async function buscarProductos(q) {
+      const box = document.getElementById('m-sug-prod');
+      if (q.length < 2) { box.style.display = 'none'; return; }
+      try {
+        const r = await fetch(`${API}/productos/buscar?q=${encodeURIComponent(q)}`);
+        const prods = await r.json();
+        if (prods.length === 0) { box.style.display = 'none'; return; }
+        
+        box.innerHTML = prods.map(p => `
+          <div class="sug-item" onclick="agregarAlCarritoMovil(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, ${p.stock})">
+            <b>${p.nombre}</b> - $${p.precio} <small>(Stock: ${p.stock})</small>
+          </div>
+        `).join('');
+        box.style.display = 'block';
+      } catch (e) {
+        console.error(e);
       }
+    }
 
-      const matchCodigo = productosCache.find(p => p.codigo_barras && p.codigo_barras.toLowerCase() === q);
-      if (matchCodigo) {
-        agregarAlCarrito(matchCodigo);
-        document.getElementById('mob-search-input').value = '';
-        resultsContainer.style.display = 'none';
-        showToast(`Agregado: ${matchCodigo.nombre}`);
-        return;
-      }
-
-      const filtrados = productosCache.filter(p => 
-        (p.nombre && p.nombre.toLowerCase().includes(q)) || 
-        (p.codigo_barras && p.codigo_barras.toLowerCase().includes(q))
-      ).slice(0, 8);
-
-      if (filtrados.length === 0) {
-        resultsContainer.innerHTML = '<div style="padding: 12px; font-size: 0.85rem; color: #94a3b8; text-align: center;">No se encontraron coincidencias</div>';
+    function agregarAlCarritoMovil(id, nombre, precio, stock) {
+      const exist = carritoMovil.find(i => i.id === id);
+      if (exist) {
+        exist.cant++;
       } else {
-        resultsContainer.innerHTML = filtrados.map(p => {
-          const imgUrl = parseImg(p.imagen);
-          const imgTag = imgUrl 
-            ? `<img src="${imgUrl}" class="prod-img-thumb">` 
-            : `<div class="prod-img-thumb" style="display:flex;align-items:center;justify-content:center;">📦</div>`;
-
-          return `
-            <div class="prod-item-row">
-              ${imgTag}
-              <div>
-                <div class="prod-info-title">${p.nombre}</div>
-                <div class="prod-info-sub">Cód: <b>${p.codigo_barras || '-'}</b> | Stock: ${p.stock} | $${parseFloat(p.precio).toFixed(2)}</div>
-              </div>
-              <button class="btn-add-mini" onclick="agregarAlCarritoId(${p.id})">+ Add</button>
-            </div>
-          `;
-        }).join('');
+        carritoMovil.push({ id, nombre, precio, stock, cant: 1 });
       }
-
-      resultsContainer.style.display = 'block';
+      document.getElementById('m-buscar-prod').value = '';
+      document.getElementById('m-sug-prod').style.display = 'none';
+      renderCarritoMovil();
     }
 
-    function agregarAlCarritoId(id) {
-      const prod = productosCache.find(p => p.id === id);
-      if (prod) {
-        agregarAlCarrito(prod);
-        document.getElementById('mob-search-input').value = '';
-        document.getElementById('mob-search-results').style.display = 'none';
-      }
-    }
-
-    function agregarAlCarrito(prod) {
-      const ex = carrito.find(item => item.id === prod.id);
-      if (ex) {
-        ex.cantidad += 1;
-      } else {
-        carrito.push({
-          id: prod.id,
-          codigo_barras: prod.codigo_barras,
-          nombre: prod.nombre,
-          precio: parseFloat(prod.precio) || 0,
-          imagen: prod.imagen || '',
-          cantidad: 1
-        });
-      }
-      renderizarCarrito();
-    }
-
-    function modificarCantidad(id, delta) {
-      const item = carrito.find(i => i.id === id);
-      if (item) {
-        item.cantidad += delta;
-        if (item.cantidad <= 0) {
-          carrito = carrito.filter(i => i.id !== id);
-        }
-      }
-      renderizarCarrito();
-    }
-
-    function eliminarItem(id) {
-      carrito = carrito.filter(i => i.id !== id);
-      renderizarCarrito();
-    }
-
-    function renderizarCarrito() {
-      const container = document.getElementById('cart-items-container');
-      const btnPay = document.getElementById('btn-abrir-cobro');
-      const lblItemCount = document.getElementById('cart-item-count');
-
-      if (carrito.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #94a3b8; font-size: 0.9rem; padding: 15px;">No hay productos agregados</p>';
-        btnPay.disabled = true;
-        lblItemCount.innerText = '0 items';
-        actualizarTotales(0);
+    function renderCarritoMovil() {
+      const cont = document.getElementById('m-carrito-lista');
+      if (carritoMovil.length === 0) {
+        cont.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">El carrito está vacío</p>';
+        document.getElementById('m-cart-total').innerText = '$0.00';
         return;
       }
 
-      let subtotal = 0;
-      let totalCantidad = 0;
-
-      container.innerHTML = carrito.map(item => {
-        const itemSubtotal = item.precio * item.cantidad;
-        subtotal += itemSubtotal;
-        totalCantidad += item.cantidad;
-
-        const imgUrl = parseImg(item.imagen);
-        const imgTag = imgUrl 
-          ? `<img src="${imgUrl}" class="prod-img-thumb" style="width:38px;height:38px;">` 
-          : `<div class="prod-img-thumb" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:0.8rem;">📦</div>`;
-
+      let total = 0;
+      cont.innerHTML = carritoMovil.map((item, idx) => {
+        const sub = item.precio * item.cant;
+        total += sub;
         return `
-          <div class="cart-item">
-            ${imgTag}
-            <div class="cart-item-details">
-              <div class="cart-item-title">${item.nombre}</div>
-              <div class="cart-item-code">Cód: ${item.codigo_barras || '-'}</div>
-              <div class="cart-item-price">$${item.precio.toFixed(2)} x ${item.cantidad} = $${itemSubtotal.toFixed(2)}</div>
+          <div class="item-row">
+            <div class="item-info">
+              <div class="item-title">${item.nombre}</div>
+              <div class="item-sub">$${item.precio} c/u</div>
             </div>
-            <div class="cart-controls">
-              <button class="btn-qty" onclick="modificarCantidad(${item.id}, -1)">-</button>
-              <span class="cart-qty-num">${item.cantidad}</span>
-              <button class="btn-qty" onclick="modificarCantidad(${item.id}, 1)">+</button>
-              <button class="btn-del-item" onclick="eliminarItem(${item.id})">🗑️</button>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button onclick="cambiarCantMovil(${idx}, -1)" style="padding:4px 10px; font-weight:bold;">-</button>
+              <b>${item.cant}</b>
+              <button onclick="cambiarCantMovil(${idx}, 1)" style="padding:4px 10px; font-weight:bold;">+</button>
             </div>
           </div>
         `;
       }).join('');
 
-      btnPay.disabled = false;
-      lblItemCount.innerText = `${totalCantidad} u.`;
-      actualizarTotales(subtotal);
+      document.getElementById('m-cart-total').innerText = `$${total.toFixed(2)}`;
     }
 
-    function actualizarTotales(subtotal) {
-      document.getElementById('lbl-total').innerText = `$${subtotal.toFixed(2)}`;
-      document.getElementById('modal-total-final').innerText = `$${subtotal.toFixed(2)}`;
+    function cambiarCantMovil(idx, delta) {
+      carritoMovil[idx].cant += delta;
+      if (carritoMovil[idx].cant <= 0) {
+        carritoMovil.splice(idx, 1);
+      }
+      renderCarritoMovil();
     }
 
-    function poblarComisionados() {
-      const sel = document.getElementById('cobro-comisionado');
-      let html = '<option value="">Venta del Local (Sin comisión)</option>';
-      html += comisionadosCache.map(c => `<option value="${c.id}">${c.nombre} (${c.porcentaje}%)</option>`).join('');
-      sel.innerHTML = html;
-    }
+    async function cobrarVentaMovil() {
+      if (carritoMovil.length === 0) return alert('Agrega al menos un producto.');
+      const btn = document.getElementById('m-btn-cobrar');
+      btn.disabled = true;
 
-    function abrirModalCobro() {
-      obtenerTurnoActivo();
-      document.getElementById('modal-cobro').classList.add('active');
-    }
-
-    function cerrarModalCobro() {
-      document.getElementById('modal-cobro').classList.remove('active');
-    }
-
-    function seleccionarMetodoPago(metodo, btn) {
-      metodoPagoSeleccionado = metodo;
-      document.querySelectorAll('.pay-btn-opt').forEach(el => el.classList.remove('selected'));
-      btn.classList.add('selected');
-
-      const boxTr = document.getElementById('box-adjunto-transferencia');
-      boxTr.style.display = (metodo === 'Transferencia') ? 'block' : 'none';
-    }
-
-    async function confirmarVentaMovil() {
-      if (carrito.length === 0) return;
-
-      await obtenerTurnoActivo();
-
-      const subtotal = carrito.reduce((acc, i) => acc + (i.precio * i.cantidad), 0);
-      const comisionadoId = document.getElementById('cobro-comisionado').value || null;
-      const comisionadoObj = comisionadosCache.find(c => String(c.id) === String(comisionadoId));
-      const vendedorNombre = comisionadoObj ? comisionadoObj.nombre : 'Venta de Mostrador';
-
-      const pagoEfectivo = metodoPagoSeleccionado === 'Efectivo' ? subtotal : 0;
-      const pagoTransferencia = metodoPagoSeleccionado === 'Transferencia' ? subtotal : 0;
-      const pagoTarjeta = metodoPagoSeleccionado === 'Tarjeta' ? subtotal : 0;
-      const pagoQr = metodoPagoSeleccionado === 'QR' ? subtotal : 0;
+      const cliente = document.getElementById('m-cliente').value.trim() || 'Venta Móvil';
+      const metodo = document.getElementById('m-metodo-pago').value;
+      const subtotal = carritoMovil.reduce((acc, i) => acc + (i.precio * i.cant), 0);
 
       const payload = {
-        turno_id: turnoActivoId,
-        vendedor: vendedorNombre,
-        cliente_nombre: `Venta Móvil (${vendedorNombre})`,
-        comisionado_id: comisionadoId ? parseInt(comisionadoId) : null,
+        cliente_nombre: cliente,
+        items: carritoMovil.map(i => ({ producto_id: i.id, cantidad: i.cant, precio: i.precio })),
         subtotal: subtotal,
         descuento: 0,
-        recargo: 0,
-        pago_efectivo: pagoEfectivo,
-        pago_tarjeta: pagoTarjeta,
-        pago_transferencia: pagoTransferencia,
-        pago_qr: pagoQr,
-        metodo_pago: metodoPagoSeleccionado,
-        pagos: JSON.stringify({ [metodoPagoSeleccionado]: subtotal }),
-        total: subtotal,
-        estado: 'completada',
-        items: carrito.map(i => ({
-          producto_id: i.id,
-          codigo_barras: i.codigo_barras,
-          nombre: i.nombre,
-          cantidad: i.cantidad,
-          precio: i.precio,
-          precio_unitario: i.precio,
-          subtotal: i.precio * i.cantidad
-        }))
+        pago_efectivo: metodo === 'efectivo' ? subtotal : 0,
+        pago_tarjeta: metodo === 'tarjeta' ? subtotal : 0,
+        pago_transferencia: metodo === 'transferencia' ? subtotal : 0,
+        pago_qr: metodo === 'qr' ? subtotal : 0,
+        total: subtotal
       };
 
       try {
@@ -862,321 +256,132 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-
-        const resData = await res.json();
-
         if (res.ok) {
-          showToast('✅ ¡Venta registrada!');
-
-          if (metodoPagoSeleccionado === 'Transferencia') {
-            await enviarResumenWhatsApp(resData.venta_id || resData.id || 'N/A', vendedorNombre, subtotal);
-          }
-
-          carrito = [];
-          renderizarCarrito();
-          cerrarModalCobro();
-          sincronizarSilencioso();
+          alert('¡Venta realizada con éxito!');
+          carritoMovil = [];
+          document.getElementById('m-cliente').value = '';
+          renderCarritoMovil();
         } else {
-          showToast('❌ Error al procesar la venta');
+          alert('Ocurrió un error al procesar la venta.');
         }
       } catch (err) {
-        showToast('❌ Error de conexión al guardar');
+        alert('Error de conexión con el servidor.');
+      } finally {
+        btn.disabled = false;
       }
     }
 
-    async function enviarResumenWhatsApp(ventaId, vendedor, total) {
-      let detalleTexto = `🧾 *RESPALDO DE VENTA BENEMEX #${ventaId}*\n` +
-                         `👤 *Vendedor:* ${vendedor}\n` +
-                         `💳 *Medio:* TRANSFERENCIA\n` +
-                         `💰 *Total:* $${total.toFixed(2)}\n\n` +
-                         `📦 *Productos:* \n`;
-
-      carrito.forEach(i => {
-        const urlFoto = parseImg(i.imagen);
-        detalleTexto += `• ${i.cantidad}x ${i.nombre} (Cód: ${i.codigo_barras || '-'}) - $${i.precio.toFixed(2)} c/u\n`;
-        if (urlFoto) detalleTexto += `   🖼️ Foto: ${urlFoto}\n`;
-      });
-
-      const inputFoto = document.getElementById('foto-comprobante-input');
-      const tieneFoto = inputFoto && inputFoto.files && inputFoto.files[0];
-
-      if (tieneFoto && navigator.canShare && navigator.canShare({ files: [inputFoto.files[0]] })) {
-        try {
-          await navigator.share({
-            title: `Respaldo Venta #${ventaId}`,
-            text: detalleTexto,
-            files: [inputFoto.files[0]]
-          });
-          return;
-        } catch (e) {}
-      }
-
-      const waUrl = `https://api.whatsapp.com/send?phone=${TELEFONO_WHATSAPP}&text=${encodeURIComponent(detalleTexto)}`;
-      window.open(waUrl, '_blank');
-    }
-
-    async function toggleCamaraScanner() {
-      const container = document.getElementById('scanner-container');
-      if (container.style.display === 'block') {
-        detenerScanner();
-      } else {
-        container.style.display = 'block';
-        try {
-          html5QrCode = new Html5Qrcode("reader");
-          await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            onScanSuccess,
-            onScanFailure
-          );
-        } catch (err) {
-          showToast('No se pudo acceder a la cámara trasera');
-          container.style.display = 'none';
-        }
-      }
-    }
-
-    function onScanSuccess(decodedText) {
-      detenerScanner();
-      document.getElementById('mob-search-input').value = decodedText;
-      buscarProductosMovil();
-    }
-
-    function onScanFailure(error) {}
-
-    function detenerScanner() {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          html5QrCode.clear();
-          html5QrCode = null;
-        }).catch(() => {
-          html5QrCode = null;
-        });
-      }
-      document.getElementById('scanner-container').style.display = 'none';
-    }
-
-    async function cargarHistorialVentas() {
+    // LISTADO Y PROCESAMIENTO DE DEVOLUCIONES MÓVIL
+    async function cargarVentasMovil() {
+      const cont = document.getElementById('m-lista-ventas');
+      cont.innerHTML = '<p style="text-align:center; color:#888;">Cargando ventas...</p>';
       try {
         const res = await fetch(`${API}/ventas`);
-        if (!res.ok) throw new Error();
-        ventasCache = await res.json();
-        renderizarHistorialVisual();
-      } catch (err) {
-        document.getElementById('historial-container').innerHTML = '<p style="text-align: center; color: #e74c3c; padding: 20px;">Error al cargar historial</p>';
+        ventasCargadas = await res.json();
+        renderListaVentasMovil(ventasCargadas);
+      } catch (e) {
+        cont.innerHTML = '<p style="text-align:center; color:#e74c3c;">Error al cargar ventas.</p>';
       }
     }
 
-    function renderizarHistorialVisual() {
-      const container = document.getElementById('historial-container');
-      if (!ventasCache || ventasCache.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px;">No hay ventas registradas</p>';
+    function renderListaVentasMovil(lista) {
+      const cont = document.getElementById('m-lista-ventas');
+      if (lista.length === 0) {
+        cont.innerHTML = '<p style="text-align:center; color:#888;">No hay ventas registradas.</p>';
         return;
       }
 
-      const ultimas = ventasCache.slice(-30).reverse();
-      container.innerHTML = ultimas.map(v => {
-        let itemsList = v.items;
-        if (typeof itemsList === 'string') {
-          try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
-        }
-
-        let itemsHtml = '';
-        if (itemsList && itemsList.length > 0) {
-          itemsHtml = itemsList.map(it => `• ${it.cantidad}x ${it.nombre || 'Prod'} (Cód: ${it.codigo_barras || '-'})`).join('<br>');
-        }
-
-        let medioPago = v.metodo_pago || 'Efectivo';
-        if (v.pago_transferencia > 0) medioPago = 'Transferencia';
-        else if (v.pago_tarjeta > 0) medioPago = 'Tarjeta';
-        else if (v.pago_qr > 0) medioPago = 'QR';
-
-        const esDevuelta = Boolean(
-          v.devuelta == 1 ||
-          v.devuelta === true ||
-          v.estado === 'Devuelto' ||
-          v.estado === 'devuelto' ||
-          v.estado === 'Cancelado' ||
-          v.estado === 'cancelado' ||
-          v.estado === 'Devolución'
-        );
+      cont.innerHTML = lista.map(v => {
+        const esDev = v.devuelta == 1 || v.estado === 'Devuelto';
+        const badge = esDev ? '<span class="badge badge-devueltas">DEVUELTA</span>' : '<span class="badge badge-ok">COMPLETADA</span>';
+        const btnDev = esDev ? '' : `<button class="btn btn-warning" style="padding:6px; font-size:0.8rem; width:auto;" onclick="abrirModalDevolucion(${v.id})">Devolver</button>`;
 
         return `
-          <div class="hist-card ${esDevuelta ? 'is-returned' : ''}">
-            <div class="hist-title">
-              <span>Venta #${v.id} - ${v.cliente_nombre || v.vendedor || 'Mostrador'}</span>
-              <span style="color:${esDevuelta ? '#e74c3c' : '#27ae60'};">
-                ${esDevuelta ? '<span class="badge-devuelto-tag">DEVUELTA</span>' : `$${(v.total || 0).toFixed(2)}`}
-              </span>
+          <div class="item-row">
+            <div class="item-info">
+              <div class="item-title">Venta #${v.id} - ${v.cliente_nombre}</div>
+              <div class="item-sub">${new Date(v.fecha).toLocaleString()} | Total: <b>$${v.total.toFixed(2)}</b></div>
+              <div style="margin-top:3px;">${badge}</div>
             </div>
-            <div class="hist-sub" style="display:flex; justify-content:space-between; align-items:center;">
-              <span>📅 ${new Date(v.fecha || Date.now()).toLocaleString()} | 💳 ${medioPago}</span>
-              ${esDevuelta 
-                ? `<button class="btn-dev-disabled" disabled>↩️ Devuelta</button>` 
-                : `<button class="btn-dev-action" onclick="prepararDevolucion(${v.id})">↩️ Devolver</button>`}
-            </div>
-            ${itemsHtml ? `<div class="hist-items-list">${itemsHtml}</div>` : ''}
+            <div>${btnDev}</div>
           </div>
         `;
       }).join('');
     }
 
-    function prepararDevolucion(ventaId) {
-      ventaParaDevolver = ventasCache.find(v => v.id === ventaId);
-      if (!ventaParaDevolver) return;
-
-      const esDevuelta = Boolean(
-        ventaParaDevolver.devuelta == 1 ||
-        ventaParaDevolver.estado === 'Devuelto' ||
-        ventaParaDevolver.estado === 'devuelto'
+    function filtrarVentas(q) {
+      const term = q.toLowerCase().trim();
+      const res = ventasCargadas.filter(v => 
+        String(v.id).includes(term) || (v.cliente_nombre && v.cliente_nombre.toLowerCase().includes(term))
       );
+      renderListaVentasMovil(res);
+    }
 
-      if (esDevuelta) {
-        showToast('⚠️ Esta venta ya fue devuelta previamente');
-        return;
+    async function abrirModalDevolucion(ventaId) {
+      try {
+        const res = await fetch(`${API}/ventas/${ventaId}/detalles`);
+        const data = await res.json();
+        ventaSeleccionadaDev = data;
+
+        document.getElementById('m-dev-info-venta').innerText = `Venta #${data.venta.id} - Cliente: ${data.venta.cliente_nombre} ($${data.venta.total.toFixed(2)})`;
+        
+        const contItems = document.getElementById('m-dev-items-lista');
+        contItems.innerHTML = data.items.map(i => `
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.9rem; margin-bottom:5px;">
+            <span>${i.cantidad}x ${i.nombre}</span>
+            <b>$${(i.cantidad * i.precio_unitario).toFixed(2)}</b>
+          </div>
+        `).join('');
+
+        document.getElementById('modal-devolucion').style.display = 'flex';
+      } catch (e) {
+        alert('No se pudieron obtener los detalles de la venta.');
       }
-
-      document.getElementById('dev-info-venta').innerText = `Venta #${ventaParaDevolver.id} - Total a Reembolsar: $${parseFloat(ventaParaDevolver.total || 0).toFixed(2)}`;
-      document.getElementById('dev-motivo-input').value = '';
-      document.getElementById('modal-devolucion').classList.add('active');
     }
 
     function cerrarModalDevolucion() {
-      document.getElementById('modal-devolucion').classList.remove('active');
-      ventaParaDevolver = null;
+      document.getElementById('modal-devolucion').style.display = 'none';
+      ventaSeleccionadaDev = null;
     }
 
-    function seleccionarMetodoDevolucion(metodo, btn) {
-      metodoDevolucionSeleccionado = metodo;
-      document.querySelectorAll('.pay-dev-opt').forEach(el => el.classList.remove('selected'));
-      btn.classList.add('selected');
-    }
-
-    // PROCESO ATÓMICO DE DEVOLUCIÓN MÓVIL
     async function confirmarDevolucionMovil() {
-      if (!ventaParaDevolver) return;
-
-      await obtenerTurnoActivo();
-
-      const motivo = document.getElementById('dev-motivo-input').value.trim() || 'Devolución Móvil';
+      if (!ventaSeleccionadaDev) return;
       
-      let itemsList = ventaParaDevolver.items;
-      if (typeof itemsList === 'string') {
-        try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
-      }
+      const btn = document.getElementById('m-btn-confirmar-dev');
+      btn.disabled = true; // EVITA LA DEVOLUCIÓN MÚLTIPLE POR DOBLE TAP
 
-      const devPayload = {
-        venta_id: ventaParaDevolver.id,
-        turno_id: turnoActivoId,
-        monto: parseFloat(ventaParaDevolver.total || 0),
-        metodo_pago: metodoDevolucionSeleccionado,
+      const v = ventaSeleccionadaDev.venta;
+      const items = ventaSeleccionadaDev.items;
+      const metodo = document.getElementById('m-dev-metodo').value;
+      const motivo = document.getElementById('m-dev-motivo').value.trim() || 'Devolución App Móvil';
+
+      const payload = {
+        venta_id: v.id,
+        monto: v.total,
+        metodo_pago: metodo,
         motivo: motivo,
-        items: itemsList || []
+        items: items
       };
 
       try {
         const res = await fetch(`${API}/devoluciones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(devPayload)
+          body: JSON.stringify(payload)
         });
 
-        // Marcar localmente como devuelta
-        ventaParaDevolver.devuelta = 1;
-        ventaParaDevolver.estado = 'Devuelto';
-
-        showToast('✅ Devolución registrada y stock restaurado');
-        cerrarModalDevolucion();
-        sincronizarSilencioso();
+        if (res.ok) {
+          alert('¡Devolución registrada correctamente!');
+          cerrarModalDevolucion();
+          cargarVentasMovil();
+        } else {
+          alert('Error al registrar la devolución.');
+        }
       } catch (e) {
-        showToast('❌ Error de conexión al procesar devolución');
+        alert('Error de conexión con el servidor.');
+      } finally {
+        btn.disabled = false;
       }
-    }
-
-    function enviarResumenHistorialWhatsApp() {
-      if (!ventasCache || ventasCache.length === 0) {
-        showToast('No hay registros en el historial para resumir');
-        return;
-      }
-
-      const fechaHoy = new Date().toLocaleDateString();
-      const ventasEfectivas = ventasCache.filter(v => v.estado !== 'Devuelto' && v.devuelta !== 1 && v.estado !== 'Cancelado');
-      const devoluciones = ventasCache.filter(v => v.estado === 'Devuelto' || v.devuelta === 1 || v.estado === 'Cancelado');
-
-      let totalVendido = 0;
-      let totalDevuelto = 0;
-
-      let texto = `📊 *RESUMEN DE OPERACIONES BENEMEX*\n` +
-                  `📅 *Fecha:* ${fechaHoy}\n` +
-                  `----------------------------------------\n\n` +
-                  `🛒 *VENTAS REGISTRADAS (${ventasEfectivas.length}):*\n`;
-
-      ventasEfectivas.forEach(v => {
-        const monto = parseFloat(v.total || 0);
-        totalVendido += monto;
-
-        let medios = [];
-        if (v.pago_efectivo > 0) medios.push(`Efectivo: $${v.pago_efectivo.toFixed(2)}`);
-        if (v.pago_transferencia > 0) medios.push(`Transf: $${v.pago_transferencia.toFixed(2)}`);
-        if (v.pago_tarjeta > 0) medios.push(`Tarjeta: $${v.pago_tarjeta.toFixed(2)}`);
-        if (v.pago_qr > 0) medios.push(`QR: $${v.pago_qr.toFixed(2)}`);
-
-        texto += `• *Venta #${v.id}* - $${monto.toFixed(2)} (${v.cliente_nombre || v.vendedor || 'Mostrador'})\n`;
-        texto += `  💳 ${medios.join(', ') || v.metodo_pago || 'Efectivo'}\n`;
-
-        let itemsList = v.items;
-        if (typeof itemsList === 'string') {
-          try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
-        }
-
-        if (itemsList && itemsList.length > 0) {
-          itemsList.forEach(it => {
-            texto += `  📦 ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
-          });
-        }
-        texto += `\n`;
-      });
-
-      if (devoluciones.length > 0) {
-        texto += `----------------------------------------\n` +
-                 `↩️ *DEVOLUCIONES REALIZADAS (${devoluciones.length}):*\n`;
-
-        devoluciones.forEach(v => {
-          const montoDev = parseFloat(v.total || 0);
-          totalDevuelto += montoDev;
-
-          texto += `• *Devolución Venta #${v.id}* - -$${montoDev.toFixed(2)}\n`;
-
-          let itemsList = v.items;
-          if (typeof itemsList === 'string') {
-            try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }
-          }
-
-          if (itemsList && itemsList.length > 0) {
-            itemsList.forEach(it => {
-              texto += `  📦 Restaurado: ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
-            });
-          }
-          texto += `\n`;
-        });
-      }
-
-      const totalNeto = totalVendido - totalDevuelto;
-
-      texto += `----------------------------------------\n` +
-               `💰 *TOTAL VENTAS:* $${totalVendido.toFixed(2)}\n` +
-               `↩️ *TOTAL DEVOLUCIONES:* -$${totalDevuelto.toFixed(2)}\n` +
-               `💵 *RECAUDACIÓN NETO TOTAL:* $${totalNeto.toFixed(2)}`;
-
-      const waUrl = `https://api.whatsapp.com/send?phone=${TELEFONO_WHATSAPP}&text=${encodeURIComponent(texto)}`;
-      window.open(waUrl, '_blank');
-    }
-
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      toast.innerText = msg;
-      toast.style.display = 'block';
-      setTimeout(() => { toast.style.display = 'none'; }, 2500);
     }
   </script>
 </body>
