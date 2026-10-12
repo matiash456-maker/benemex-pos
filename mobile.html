@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>BENEMEX POS Móvil</title>
-
-  <link rel="manifest" href="manifest.json">
+  
   <meta name="theme-color" content="#2c3e50">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="logo-home-cut.jpg">
+  <link rel="manifest" href="manifest.json">
 
   <!-- Lector de código de barras por cámara -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -18,7 +18,7 @@
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { background-color: #f4f6f9; color: #333; padding-bottom: 70px; user-select: none; }
 
-    /* PANTALLA DE BLOQUEO / SEGURIDAD */
+    /* PANTALLA DE BLOQUEO POR CONTRASEÑA PERMANENTE */
     .lock-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -281,7 +281,7 @@
       gap: 10px;
       margin-bottom: 15px;
     }
-    .pay-btn-opt {
+    .pay-btn-opt, .pay-dev-opt {
       border: 1.5px solid #cbd5e1;
       border-radius: 8px;
       padding: 12px;
@@ -290,7 +290,7 @@
       background: #f8fafc;
       color: #334155;
     }
-    .pay-btn-opt.selected {
+    .pay-btn-opt.selected, .pay-dev-opt.selected {
       border-color: #2c3e50;
       background-color: #2c3e50;
       color: white;
@@ -303,9 +303,33 @@
       margin-bottom: 10px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.04);
     }
-    .hist-title { font-weight: bold; font-size: 0.95rem; color: #2c3e50; display: flex; justify-content: space-between; }
+    .hist-card.is-returned {
+      background: #fff5f5;
+      border-left: 4px solid #e74c3c;
+    }
+    .hist-title { font-weight: bold; font-size: 0.95rem; color: #2c3e50; display: flex; justify-content: space-between; align-items: center; }
     .hist-sub { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
     .hist-items-list { font-size: 0.8rem; color: #334155; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e2e8f0; }
+
+    .btn-dev-action {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .badge-devuelto-tag {
+      background-color: #fadbd8;
+      color: #78281f;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
 
     #scanner-container {
       width: 100%;
@@ -344,12 +368,12 @@
 </head>
 <body>
 
-  <!-- PANTALLA DE BLOQUEO POR CONTRASEÑA -->
+  <!-- PANTALLA DE BLOQUEO PERMANENTE -->
   <div id="lock-screen" class="lock-overlay">
     <div class="lock-card">
       <div class="lock-icon">🔒</div>
       <h2>Acceso Restringido</h2>
-      <p>Ingresa la contraseña de la empresa para habilitar la app:</p>
+      <p>Ingresa la contraseña para habilitar la app:</p>
       <input type="password" id="pass-input" class="input-field" placeholder="Contraseña..." onkeyup="if(event.key==='Enter') verificarPassword()">
       <button class="btn-main-pay" style="margin-top: 15px;" onclick="verificarPassword()">Ingresar</button>
     </div>
@@ -402,12 +426,12 @@
   <!-- PESTAÑA HISTORIAL -->
   <main id="tab-historial" class="tab-content">
     <button class="btn-whatsapp-summary" onclick="enviarResumenHistorialWhatsApp()">
-      💬 Enviar Resumen de Ventas a WhatsApp
+      💬 Enviar Resumen de Ventas y Devoluciones
     </button>
 
-    <h3 style="margin-bottom: 12px; color: #2c3e50;">📜 Ventas Recientes</h3>
+    <h3 style="margin-bottom: 12px; color: #2c3e50;">📜 Historial del Día</h3>
     <div id="historial-container">
-      <p style="text-align: center; color: #94a3b8; padding: 20px;">Cargando ventas...</p>
+      <p style="text-align: center; color: #94a3b8; padding: 20px;">Cargando historial...</p>
     </div>
   </main>
 
@@ -442,7 +466,6 @@
         <div class="pay-btn-opt" onclick="seleccionarMetodoPago('QR', this)">📱 QR</div>
       </div>
 
-      <!-- ADJUNTO DE COMPROBANTE PARA TRANSFERENCIA -->
       <div id="box-adjunto-transferencia" class="file-upload-box" style="display: none;">
         <label style="font-size: 0.85rem; font-weight: bold; color: #1d4ed8; display: block; margin-bottom: 6px;">
           📷 Sacar foto al Comprobante de Transferencia:
@@ -462,6 +485,33 @@
     </div>
   </div>
 
+  <!-- MODAL DE DEVOLUCIÓN DE VENTA -->
+  <div id="modal-devolucion" class="modal-overlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">↩️ Procesar Devolución</span>
+        <button class="btn-close-modal" onclick="cerrarModalDevolucion()">&times;</button>
+      </div>
+
+      <p id="dev-info-venta" style="font-size: 0.9rem; color: #1e293b; margin-bottom: 12px; font-weight: 600;"></p>
+
+      <label style="font-size: 0.85rem; font-weight: bold; color: #475569; display: block; margin-bottom: 8px;">Método para devolver el dinero:</label>
+      <div class="payment-methods-grid">
+        <div class="pay-dev-opt selected" onclick="seleccionarMetodoDevolucion('Efectivo', this)">💵 Efectivo</div>
+        <div class="pay-dev-opt" onclick="seleccionarMetodoDevolucion('Transferencia', this)">📲 Transfer.</div>
+        <div class="pay-dev-opt" onclick="seleccionarMetodoDevolucion('Tarjeta', this)">💳 Tarjeta</div>
+        <div class="pay-dev-opt" onclick="seleccionarMetodoDevolucion('QR', this)">📱 QR</div>
+      </div>
+
+      <label style="font-size: 0.85rem; font-weight: bold; color: #475569; display: block; margin-top: 10px;">Motivo de la Devolución:</label>
+      <input type="text" id="dev-motivo-input" class="input-field" placeholder="Ej: Error de tipeo / Cambio de producto" style="margin-top: 5px; margin-bottom: 15px;">
+
+      <button class="btn-main-pay" style="background-color: #e74c3c;" onclick="confirmarDevolucionMovil()">
+        ↩️ CONFIRMAR DEVOLUCIÓN Y RESTAURAR STOCK
+      </button>
+    </div>
+  </div>
+
   <script>
     const API = 'https://benemex-pos.onrender.com/api';
     const TELEFONO_WHATSAPP = '5493874642295';
@@ -472,21 +522,24 @@
     let ventasCache = [];
     let carrito = [];
     let metodoPagoSeleccionado = 'Efectivo';
+    let metodoDevolucionSeleccionado = 'Efectivo';
+    let ventaParaDevolver = null;
     let html5QrCode = null;
 
+    // PERSISTENCIA DE CONTRASEÑA CON LOCALSTORAGE
     window.addEventListener('DOMContentLoaded', () => {
-      if (sessionStorage.getItem('benemex_app_auth') === 'true') {
+      if (localStorage.getItem('benemex_app_auth') === 'true') {
         desbloquearApp();
       }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
     });
-    
-    if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
+
     function verificarPassword() {
       const input = document.getElementById('pass-input').value;
       if (input === CONTRASEÑA_ACCESO) {
-        sessionStorage.setItem('benemex_app_auth', 'true');
+        localStorage.setItem('benemex_app_auth', 'true');
         desbloquearApp();
       } else {
         showToast('❌ Contraseña incorrecta');
@@ -838,6 +891,7 @@
       document.getElementById('scanner-container').style.display = 'none';
     }
 
+    // CARGA DE HISTORIAL Y MANEJO DE DEVOLUCIONES
     async function cargarHistorialVentas() {
       const container = document.getElementById('historial-container');
       try {
@@ -850,7 +904,7 @@
           return;
         }
 
-        const ultimas = ventasCache.slice(-20).reverse();
+        const ultimas = ventasCache.slice(-25).reverse();
         container.innerHTML = ultimas.map(v => {
           let itemsHtml = '';
           if (v.items && v.items.length > 0) {
@@ -862,14 +916,19 @@
           else if (v.pago_tarjeta > 0) medioPago = 'Tarjeta';
           else if (v.pago_qr > 0) medioPago = 'QR';
 
+          const esDevuelta = v.estado === 'Devuelto' || v.devuelta === 1 || v.estado === 'Cancelado';
+
           return `
-            <div class="hist-card">
+            <div class="hist-card ${esDevuelta ? 'is-returned' : ''}">
               <div class="hist-title">
                 <span>Venta #${v.id} - ${v.cliente_nombre || 'Mostrador'}</span>
-                <span style="color:#27ae60;">$${(v.total || 0).toFixed(2)}</span>
+                <span style="color:${esDevuelta ? '#e74c3c' : '#27ae60'};">
+                  ${esDevuelta ? '<span class="badge-devuelto-tag">DEVUELTA</span>' : `$${(v.total || 0).toFixed(2)}`}
+                </span>
               </div>
-              <div class="hist-sub">
-                📅 ${new Date(v.fecha).toLocaleString()} | 💳 ${medioPago}
+              <div class="hist-sub" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>📅 ${new Date(v.fecha).toLocaleString()} | 💳 ${medioPago}</span>
+                ${!esDevuelta ? `<button class="btn-dev-action" onclick="prepararDevolucion(${v.id})">↩️ Devolver</button>` : ''}
               </div>
               ${itemsHtml ? `<div class="hist-items-list">${itemsHtml}</div>` : ''}
             </div>
@@ -880,23 +939,76 @@
       }
     }
 
+    // MODAL DE DEVOLUCIÓN
+    function prepararDevolucion(ventaId) {
+      ventaParaDevolver = ventasCache.find(v => v.id === ventaId);
+      if (!ventaParaDevolver) return;
+
+      document.getElementById('dev-info-venta').innerText = `Venta #${ventaParaDevolver.id} - Total a Reembolsar: $${parseFloat(ventaParaDevolver.total || 0).toFixed(2)}`;
+      document.getElementById('dev-motivo-input').value = '';
+      document.getElementById('modal-devolucion').classList.add('active');
+    }
+
+    function cerrarModalDevolucion() {
+      document.getElementById('modal-devolucion').classList.remove('active');
+      ventaParaDevolver = null;
+    }
+
+    function seleccionarMetodoDevolucion(metodo, btn) {
+      metodoDevolucionSeleccionado = metodo;
+      document.querySelectorAll('.pay-dev-opt').forEach(el => el.classList.remove('selected'));
+      btn.classList.add('selected');
+    }
+
+    async function confirmarDevolucionMovil() {
+      if (!ventaParaDevolver) return;
+
+      const motivo = document.getElementById('dev-motivo-input').value.trim() || 'Devolución desde App Móvil';
+
+      try {
+        const res = await fetch(`${API}/ventas/${ventaParaDevolver.id}/devolucion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            metodo_pago: metodoDevolucionSeleccionado,
+            motivo: motivo
+          })
+        });
+
+        if (res.ok) {
+          showToast('✅ Devolución registrada y Stock restaurado');
+          cerrarModalDevolucion();
+          cargarDatosIniciales();
+        } else {
+          showToast('❌ Error al procesar la devolución');
+        }
+      } catch (e) {
+        showToast('❌ Error de conexión');
+      }
+    }
+
+    // RESUMEN GENERAL A WHATSAPP (VENTAS + DEVOLUCIONES)
     function enviarResumenHistorialWhatsApp() {
       if (!ventasCache || ventasCache.length === 0) {
-        showToast('No hay ventas en el historial para resumir');
+        showToast('No hay registros en el historial para resumir');
         return;
       }
 
       const fechaHoy = new Date().toLocaleDateString();
-      let texto = `📊 *RESUMEN GENERAL DE VENTAS BENEMEX*\n` +
+      const ventasEfectivas = ventasCache.filter(v => v.estado !== 'Devuelto' && v.devuelta !== 1 && v.estado !== 'Cancelado');
+      const devoluciones = ventasCache.filter(v => v.estado === 'Devuelto' || v.devuelta === 1 || v.estado === 'Cancelado');
+
+      let totalVendido = 0;
+      let totalDevuelto = 0;
+
+      let texto = `📊 *RESUMEN DE OPERACIONES BENEMEX*\n` +
                   `📅 *Fecha:* ${fechaHoy}\n` +
-                  `🔢 *Total Ventas:* ${ventasCache.length}\n` +
-                  `----------------------------------------\n\n`;
+                  `----------------------------------------\n\n` +
+                  `🛒 *VENTAS REGISTRADAS (${ventasEfectivas.length}):*\n`;
 
-      let granTotal = 0;
-
-      ventasCache.forEach(v => {
+      ventasEfectivas.forEach(v => {
         const monto = parseFloat(v.total || 0);
-        granTotal += monto;
+        totalVendido += monto;
 
         let medios = [];
         if (v.pago_efectivo > 0) medios.push(`Efectivo: $${v.pago_efectivo.toFixed(2)}`);
@@ -904,21 +1016,41 @@
         if (v.pago_tarjeta > 0) medios.push(`Tarjeta: $${v.pago_tarjeta.toFixed(2)}`);
         if (v.pago_qr > 0) medios.push(`QR: $${v.pago_qr.toFixed(2)}`);
 
-        texto += `🧾 *Venta #${v.id}* - $${monto.toFixed(2)}\n`;
-        texto += `👤 *Cliente/Vendedor:* ${v.cliente_nombre || 'Mostrador'}\n`;
-        texto += `💳 *Pago:* ${medios.join(', ') || 'Efectivo'}\n`;
-        
+        texto += `• *Venta #${v.id}* - $${monto.toFixed(2)} (${v.cliente_nombre || 'Mostrador'})\n`;
+        texto += `  💳 ${medios.join(', ') || 'Efectivo'}\n`;
+
         if (v.items && v.items.length > 0) {
-          texto += `📦 *Detalle:* \n`;
           v.items.forEach(it => {
-            texto += `  • ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
+            texto += `  📦 ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
           });
         }
         texto += `\n`;
       });
 
-      texto += `----------------------------------------\n`;
-      texto += `💰 *GRAN TOTAL RECAUDADO:* $${granTotal.toFixed(2)}`;
+      if (devoluciones.length > 0) {
+        texto += `----------------------------------------\n` +
+                 `↩️ *DEVOLUCIONES REALIZADAS (${devoluciones.length}):*\n`;
+
+        devoluciones.forEach(v => {
+          const montoDev = parseFloat(v.total || 0);
+          totalDevuelto += montoDev;
+
+          texto += `• *Devolución Venta #${v.id}* - -$${montoDev.toFixed(2)}\n`;
+          if (v.items && v.items.length > 0) {
+            v.items.forEach(it => {
+              texto += `  📦 Restaurado: ${it.cantidad}x ${it.nombre || 'Prod'} [Cód: ${it.codigo_barras || '-'}]\n`;
+            });
+          }
+          texto += `\n`;
+        });
+      }
+
+      const totalNeto = totalVendido - totalDevuelto;
+
+      texto += `----------------------------------------\n` +
+               `💰 *TOTAL VENTAS:* $${totalVendido.toFixed(2)}\n` +
+               `↩️ *TOTAL DEVOLUCIONES:* -$${totalDevuelto.toFixed(2)}\n` +
+               `💵 *RECAUDACIÓN NETO TOTAL:* $${totalNeto.toFixed(2)}`;
 
       const waUrl = `https://api.whatsapp.com/send?phone=${TELEFONO_WHATSAPP}&text=${encodeURIComponent(texto)}`;
       window.open(waUrl, '_blank');
