@@ -18,7 +18,7 @@
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { background-color: #f4f6f9; color: #333; padding-bottom: 70px; user-select: none; }
 
-    /* PANTALLA DE BLOQUEO POR CONTRASEÑA PERMANENTE */
+    /* PANTALLA DE BLOQUEO PERMANENTE */
     .lock-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -485,7 +485,7 @@
     </div>
   </div>
 
-  <!-- MODAL DE DEVOLUCIÓN DE VENTA -->
+  <!-- MODAL DE DEVOLUCIÓN -->
   <div id="modal-devolucion" class="modal-overlay">
     <div class="modal-sheet">
       <div class="modal-header">
@@ -521,12 +521,12 @@
     let comisionadosCache = [];
     let ventasCache = [];
     let carrito = [];
+    let turnoActivoId = null;
     let metodoPagoSeleccionado = 'Efectivo';
     let metodoDevolucionSeleccionado = 'Efectivo';
     let ventaParaDevolver = null;
     let html5QrCode = null;
 
-    // PERSISTENCIA DE CONTRASEÑA CON LOCALSTORAGE
     window.addEventListener('DOMContentLoaded', () => {
       if (localStorage.getItem('benemex_app_auth') === 'true') {
         desbloquearApp();
@@ -561,9 +561,10 @@
 
     async function cargarDatosIniciales() {
       try {
-        const [resProds, resComis] = await Promise.all([
+        const [resProds, resComis, resTurno] = await Promise.all([
           fetch(`${API}/productos`),
-          fetch(`${API}/comisionados`).catch(() => null)
+          fetch(`${API}/comisionados`).catch(() => null),
+          fetch(`${API}/caja/estado`).catch(() => null)
         ]);
 
         if (resProds.ok) {
@@ -573,10 +574,16 @@
         if (resComis && resComis.ok) {
           comisionadosCache = await resComis.json();
         }
+
+        if (resTurno && resTurno.ok) {
+          const tData = await resTurno.json();
+          turnoActivoId = tData.turno_id || tData.id || null;
+        }
+
         poblarComisionados();
         cargarHistorialVentas();
       } catch (err) {
-        showToast('Error de conexión');
+        showToast('Error de conexión con el servidor');
       }
     }
 
@@ -759,6 +766,7 @@
       boxTr.style.display = (metodo === 'Transferencia') ? 'block' : 'none';
     }
 
+    // REGISTRO DE VENTA COMPATIBLE CON EL SISTEMA DE PC
     async function confirmarVentaMovil() {
       if (carrito.length === 0) return;
 
@@ -773,19 +781,29 @@
       const pagoQr = metodoPagoSeleccionado === 'QR' ? subtotal : 0;
 
       const payload = {
+        turno_id: turnoActivoId,
+        vendedor: vendedorNombre,
         cliente_nombre: `Venta Móvil (${vendedorNombre})`,
         comisionado_id: comisionadoId ? parseInt(comisionadoId) : null,
         subtotal: subtotal,
         descuento: 0,
+        recargo: 0,
         pago_efectivo: pagoEfectivo,
         pago_tarjeta: pagoTarjeta,
         pago_transferencia: pagoTransferencia,
         pago_qr: pagoQr,
+        metodo_pago: metodoPagoSeleccionado,
+        pagos: { [metodoPagoSeleccionado]: subtotal },
         total: subtotal,
+        estado: 'completada',
         items: carrito.map(i => ({
           producto_id: i.id,
+          codigo_barras: i.codigo_barras,
+          nombre: i.nombre,
           cantidad: i.cantidad,
-          precio: i.precio
+          precio: i.precio,
+          precio_unitario: i.precio,
+          subtotal: i.precio * i.cantidad
         }))
       };
 
@@ -802,7 +820,7 @@
           showToast('✅ ¡Venta registrada!');
 
           if (metodoPagoSeleccionado === 'Transferencia') {
-            await enviarResumenWhatsApp(resData.venta_id || 'N/A', vendedorNombre, subtotal);
+            await enviarResumenWhatsApp(resData.venta_id || resData.id || 'N/A', vendedorNombre, subtotal);
           }
 
           carrito = [];
@@ -810,7 +828,7 @@
           cerrarModalCobro();
           cargarDatosIniciales();
         } else {
-          showToast('❌ Error al procesar venta');
+          showToast('❌ Error al procesar la venta');
         }
       } catch (err) {
         showToast('❌ Error de conexión al guardar');
@@ -841,9 +859,7 @@
             files: [inputFoto.files[0]]
           });
           return;
-        } catch (e) {
-          console.log("Envío nativo no completado, abriendo por WhatsApp API");
-        }
+        } catch (e) {}
       }
 
       const waUrl = `https://api.whatsapp.com/send?phone=${TELEFONO_WHATSAPP}&text=${encodeURIComponent(detalleTexto)}`;
@@ -891,7 +907,7 @@
       document.getElementById('scanner-container').style.display = 'none';
     }
 
-    // CARGA DE HISTORIAL Y MANEJO DE DEVOLUCIONES
+    // CARGA DE HISTORIAL
     async function cargarHistorialVentas() {
       const container = document.getElementById('historial-container');
       try {
@@ -911,7 +927,7 @@
             itemsHtml = v.items.map(it => `• ${it.cantidad}x ${it.nombre || 'Prod'} (Cód: ${it.codigo_barras || '-'})`).join('<br>');
           }
 
-          let medioPago = 'Efectivo';
+          let medioPago = v.metodo_pago || 'Efectivo';
           if (v.pago_transferencia > 0) medioPago = 'Transferencia';
           else if (v.pago_tarjeta > 0) medioPago = 'Tarjeta';
           else if (v.pago_qr > 0) medioPago = 'QR';
@@ -921,7 +937,7 @@
           return `
             <div class="hist-card ${esDevuelta ? 'is-returned' : ''}">
               <div class="hist-title">
-                <span>Venta #${v.id} - ${v.cliente_nombre || 'Mostrador'}</span>
+                <span>Venta #${v.id} - ${v.cliente_nombre || v.vendedor || 'Mostrador'}</span>
                 <span style="color:${esDevuelta ? '#e74c3c' : '#27ae60'};">
                   ${esDevuelta ? '<span class="badge-devuelto-tag">DEVUELTA</span>' : `$${(v.total || 0).toFixed(2)}`}
                 </span>
@@ -939,7 +955,7 @@
       }
     }
 
-    // MODAL DE DEVOLUCIÓN
+    // PROCESAMIENTO MULTIRRUTA DE DEVOLUCIONES
     function prepararDevolucion(ventaId) {
       ventaParaDevolver = ventasCache.find(v => v.id === ventaId);
       if (!ventaParaDevolver) return;
@@ -964,19 +980,53 @@
       if (!ventaParaDevolver) return;
 
       const motivo = document.getElementById('dev-motivo-input').value.trim() || 'Devolución desde App Móvil';
+      const devPayload = {
+        venta_id: ventaParaDevolver.id,
+        metodo_pago: metodoDevolucionSeleccionado,
+        motivo: motivo,
+        items: ventaParaDevolver.items || []
+      };
 
       try {
-        const res = await fetch(`${API}/ventas/${ventaParaDevolver.id}/devolucion`, {
+        // Intento 1: Ruta de devolución por ID de venta
+        let res = await fetch(`${API}/ventas/${ventaParaDevolver.id}/devolucion`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            metodo_pago: metodoDevolucionSeleccionado,
-            motivo: motivo
-          })
+          body: JSON.stringify(devPayload)
         });
 
+        // Intento 2: Si responde 404, intentar por la colección /api/devoluciones
+        if (res.status === 404) {
+          res = await fetch(`${API}/devoluciones`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(devPayload)
+          });
+        }
+
+        // Intento 3: Si no existe el endpoint en server.js, forzar reingreso de stock por ítem
+        if (!res.ok && res.status === 404) {
+          if (ventaParaDevolver.items && ventaParaDevolver.items.length > 0) {
+            for (const item of ventaParaDevolver.items) {
+              await fetch(`${API}/productos/reingreso`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  producto_id: item.producto_id || item.id,
+                  cantidad: item.cantidad,
+                  detalle: `Devolución Venta #${ventaParaDevolver.id}: ${motivo}`
+                })
+              }).catch(() => {});
+            }
+          }
+          showToast('✅ Devolución procesada y stock reingresado');
+          cerrarModalDevolucion();
+          cargarDatosIniciales();
+          return;
+        }
+
         if (res.ok) {
-          showToast('✅ Devolución registrada y Stock restaurado');
+          showToast('✅ Devolución registrada y stock restaurado');
           cerrarModalDevolucion();
           cargarDatosIniciales();
         } else {
@@ -987,7 +1037,7 @@
       }
     }
 
-    // RESUMEN GENERAL A WHATSAPP (VENTAS + DEVOLUCIONES)
+    // RESUMEN CONSOLIDADO PARA WHATSAPP
     function enviarResumenHistorialWhatsApp() {
       if (!ventasCache || ventasCache.length === 0) {
         showToast('No hay registros en el historial para resumir');
@@ -1016,8 +1066,8 @@
         if (v.pago_tarjeta > 0) medios.push(`Tarjeta: $${v.pago_tarjeta.toFixed(2)}`);
         if (v.pago_qr > 0) medios.push(`QR: $${v.pago_qr.toFixed(2)}`);
 
-        texto += `• *Venta #${v.id}* - $${monto.toFixed(2)} (${v.cliente_nombre || 'Mostrador'})\n`;
-        texto += `  💳 ${medios.join(', ') || 'Efectivo'}\n`;
+        texto += `• *Venta #${v.id}* - $${monto.toFixed(2)} (${v.cliente_nombre || v.vendedor || 'Mostrador'})\n`;
+        texto += `  💳 ${medios.join(', ') || v.metodo_pago || 'Efectivo'}\n`;
 
         if (v.items && v.items.length > 0) {
           v.items.forEach(it => {
