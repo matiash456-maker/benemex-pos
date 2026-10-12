@@ -11,8 +11,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BENEMEX POS">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232c3e50'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='60'>📱</text></svg>">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22POS%20BENEMEX%20M%C3%B3vil%22%2C%22short_name%22%3A%22BENEMEX%22%2C%22start_url%22%3A%22%2Fmobile.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%232c3e50%22%2C%22theme_color%22%3A%22%232c3e50%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%232c3e50'%2F%3E%3Ctext%20x%3D'50%25'%20y%3D'55%25'%20dominant-baseline%3D'middle'%20text-anchor%3D'middle'%20font-size%3D'60'%3E%F0%9F%93%B1%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1041/1041888.png">
+  <link rel="manifest" href="/manifest.json">
 
   <!-- Librería para lectura de Código de Barras con la cámara -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -165,14 +165,18 @@
   <div id="modal-post-venta" class="modal">
     <div class="modal-content" style="text-align:center;">
       <h2 style="color:#27ae60; margin-bottom:10px;">✅ ¡Venta Registrada!</h2>
-      <p id="post-venta-resumen" style="font-size:0.95rem; color:#333; margin-bottom:15px; font-weight:bold;"></p>
+      <p id="post-venta-resumen" style="font-size:0.95rem; color:#333; margin-bottom:10px; font-weight:bold;"></p>
       
-      <!-- Input de archivo oculto activado por toque directo -->
-      <input type="file" id="input-foto-post" accept="image/*" capture="environment" style="display:none;" onchange="procesarFotoYEnviarWhatsApp(this)">
+      <!-- Selector de archivo oculto -->
+      <input type="file" id="input-foto-post" accept="image/*" capture="environment" style="display:none;" onchange="alSeleccionarFotoPostVenta(this)">
 
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-whatsapp" onclick="tomarFotoComprobante()">📸 Tomar Comprobante y Enviar a WhatsApp</button>
-        <button class="btn btn-primary" onclick="enviarSoloTextoWhatsApp()">💬 Enviar solo Texto por WhatsApp</button>
+      <!-- Previsualización de la foto seleccionada -->
+      <div id="post-venta-foto-preview"></div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+        <button class="btn btn-primary" onclick="activarCamaraPostVenta()">📷 Tomar / Adjuntar Foto Comprobante</button>
+        <button id="btn-compartir-foto-wa" class="btn btn-whatsapp" style="display:none;" onclick="compartirPostVentaConFoto()">📲 Enviar a WhatsApp (Con Foto y Detalle)</button>
+        <button class="btn btn-whatsapp" onclick="enviarSoloTextoWhatsApp()">💬 Enviar a WhatsApp (Solo Texto)</button>
         <button class="btn btn-warning" onclick="cerrarModalPostVenta()">✖️ Finalizar sin Enviar</button>
       </div>
     </div>
@@ -226,7 +230,7 @@
   </nav>
 
   <script>
-    // CONFIGURACIÓN PWA SECURIZADA Y NO INVASIVA
+    // REGISTRO SEGURO Y EVENTO DE INSTALACIÓN PWA
     let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -250,11 +254,7 @@
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        try {
-          const swCode = "self.addEventListener('fetch', function(e) { e.respondWith(fetch(e.request)); });";
-          const blob = new Blob([swCode], { type: 'text/javascript' });
-          navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
-        } catch(e) {}
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
       });
     }
 
@@ -270,6 +270,7 @@
     let fotoDevolucionNombre = '';
     let fotoDevolucionFile = null;
     let textoVentaParaCompartir = '';
+    let fotoComprobanteCapturada = null;
 
     function formatearFecha24hs(fechaStr) {
       if (!fechaStr) return '-';
@@ -534,7 +535,6 @@
           const data = await res.json();
           let recargoTxt = recargoPorc > 0 ? `\nRecargo (${recargoPorc}%): +$${montoRecargo.toFixed(2)}` : '';
 
-          // Construcción del texto descriptivo completo
           textoVentaParaCompartir = `🛒 *COMPROBANTE DE VENTA BENEMEX*\n\n` +
             `Venta #${data.venta_id || ''}\n` +
             `Cliente: ${cliente}\n` +
@@ -544,14 +544,15 @@
             `\nSubtotal: $${subtotal.toFixed(2)}${recargoTxt}` +
             `\n\n*TOTAL: $${totalFinal.toFixed(2)}*`;
 
-          // Limpieza de formulario y carrito tras guardar en BD
           carritoMovil = [];
+          fotoComprobanteCapturada = null;
           document.getElementById('m-cliente').value = '';
           document.getElementById('m-recargo').value = '0';
           document.getElementById('m-metodo-pago').value = 'efectivo';
+          document.getElementById('post-venta-foto-preview').innerHTML = '';
+          document.getElementById('btn-compartir-foto-wa').style.display = 'none';
           renderCarritoMovil();
 
-          // Abrir modal de confirmación y opciones de envío
           document.getElementById('post-venta-resumen').innerText = `Venta #${data.venta_id || ''} - Total: $${totalFinal.toFixed(2)}`;
           document.getElementById('modal-post-venta').style.display = 'flex';
 
@@ -566,19 +567,43 @@
       }
     }
 
-    // NÚCLEO DE FOTO Y ENVÍO POST-VENTA
-    function tomarFotoComprobante() {
+    // MANEJO DE FOTO Y COMPARTICIÓN DIRECTA
+    function activarCamaraPostVenta() {
       const input = document.getElementById('input-foto-post');
       input.value = '';
       input.click();
     }
 
-    async function procesarFotoYEnviarWhatsApp(input) {
+    function alSeleccionarFotoPostVenta(input) {
+      const previewBox = document.getElementById('post-venta-foto-preview');
+      const btnCompartirConFoto = document.getElementById('btn-compartir-foto-wa');
+
       if (input.files && input.files[0]) {
-        const foto = input.files[0];
-        await compartirWhatsApp(textoVentaParaCompartir, foto);
-        cerrarModalPostVenta();
+        fotoComprobanteCapturada = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          previewBox.innerHTML = `
+            <div style="margin:8px 0; text-align:center;">
+              <p style="font-size:0.85rem; color:#27ae60; font-weight:bold; margin-bottom:4px;">📸 Foto adjuntada correctamente</p>
+              <img src="${e.target.result}" style="max-width:120px; max-height:120px; border-radius:6px; border:2px solid #27ae60;">
+            </div>
+          `;
+          btnCompartirConFoto.style.display = 'inline-block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        fotoComprobanteCapturada = null;
+        previewBox.innerHTML = '';
+        btnCompartirConFoto.style.display = 'none';
       }
+    }
+
+    async function compartirPostVentaConFoto() {
+      if (!fotoComprobanteCapturada) {
+        return alert('Por favor toma o adjunta una foto del comprobante.');
+      }
+      await compartirWhatsApp(textoVentaParaCompartir, fotoComprobanteCapturada);
+      cerrarModalPostVenta();
     }
 
     async function enviarSoloTextoWhatsApp() {
@@ -589,6 +614,7 @@
     function cerrarModalPostVenta() {
       document.getElementById('modal-post-venta').style.display = 'none';
       textoVentaParaCompartir = '';
+      fotoComprobanteCapturada = null;
     }
 
     async function cargarVentasMovil() {
@@ -841,6 +867,7 @@
     }
 
     async function compartirWhatsApp(texto, archivo = null) {
+      let compartido = false;
       if (archivo && navigator.share) {
         try {
           let fileToShare = archivo;
@@ -853,14 +880,22 @@
               text: texto,
               files: [fileToShare]
             });
+            compartido = true;
             return;
           }
         } catch (e) {
           console.log("Web Share cancelado o no soportado:", e);
         }
       }
-      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-      window.open(url, '_blank');
+
+      if (!compartido) {
+        try {
+          await navigator.clipboard.writeText(texto);
+          alert("✅ Detalle del comprobante copiado al portapapeles.\n\nSe abrirá WhatsApp para que pegues el detalle y adjuntes la foto.");
+        } catch(err) {}
+        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+        window.open(url, '_blank');
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
