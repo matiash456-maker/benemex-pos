@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const db = require('./database.js');
+import db from './database.js';
 
 const app = express();
 app.use(cors());
