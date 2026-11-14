@@ -1,6 +1,7 @@
 {
   "name": "mi-sistema-pos",
   "version": "1.0.0",
+  "type": "module",
   "description": "Sistema POS BENEMEX",
   "main": "main.js",
   "scripts": {
