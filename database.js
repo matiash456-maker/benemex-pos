@@ -1,4 +1,4 @@
-const { createClient } = requiere('@libsql/client');
+import { createClient } from '@libsql/client';
 
 const client = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -173,7 +173,7 @@ async function inicializarBaseDatos() {
       )
     `);
 
-    console.log("Base de datos conectada y verificada correctamente.");
+    console.log("Base de datos en Turso inicializada con éxito.");
   } catch (error) {
     console.error("Error al inicializar la base de datos:", error);
   }
@@ -181,7 +181,7 @@ async function inicializarBaseDatos() {
 
 inicializarBaseDatos();
 
-module.exports = {
+export default {
   query: async (sql, params = []) => {
     const result = await client.execute({ sql, args: params });
     return result.rows.map(row => {
