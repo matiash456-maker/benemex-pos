@@ -28,7 +28,7 @@
     .btn-danger { background-color: #e74c3c; padding: 5px 10px; font-size: 0.8rem;}
     .btn-block { width: 100%; }
     .sug-box { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .sug-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .sug-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; align-items: center;}
     .sug-item:hover { background: #f8fafc; }
     .chart-box { max-width: 800px; margin: 0 auto 20px auto; }
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; }
@@ -262,7 +262,7 @@
         </div>
 
         <table style="margin-bottom:15px;">
-          <thead><tr><th>Foto</th><th>Producto</th><th>Cantidad Actual</th><th>Subtotal</th><th>Modificar Cantidad / Quitar</th></tr></thead>
+          <thead><tr><th>Foto</th><th>Código</th><th>Producto</th><th>Cantidad Actual</th><th>Subtotal</th><th>Modificar Cantidad / Quitar</th></tr></thead>
           <tbody id="tabla-detalles-venta"></tbody>
         </table>
       </div>
@@ -330,10 +330,11 @@
 
       <div>
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
             <h2>Catálogo Interno</h2>
-            <div style="width: 220px;">
-              <select id="inv-cat-filter" onchange="renderTablaInventario()">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input type="text" id="inv-buscar-filter" placeholder="Buscar nombre o código..." oninput="renderTablaInventario()" style="padding:6px; border:1px solid #ccc; border-radius:5px;">
+              <select id="inv-cat-filter" onchange="renderTablaInventario()" style="width: auto; padding:6px;">
                 <option value="">-- Todas las Categorías --</option>
                 <option value="Hogar">Hogar</option>
                 <option value="Anime/Juguetes">Anime/Juguetes</option>
@@ -562,7 +563,7 @@
       </div>
       
       <table style="margin-bottom:15px;">
-        <thead><tr><th>Foto</th><th>Producto</th><th>Cantidad Actual</th><th>Subtotal</th><th>Modificar Cantidad / Quitar</th></tr></thead>
+        <thead><tr><th>Foto</th><th>Código</th><th>Producto</th><th>Cantidad Actual</th><th>Subtotal</th><th>Modificar Cantidad / Quitar</th></tr></thead>
         <tbody id="tabla-detalles-pedido"></tbody>
       </table>
     </div>
@@ -610,8 +611,9 @@
   <div id="tab-comisiones" class="tab-content">
     <div class="grid-2">
       <div class="card">
-        <h2>👤 Registrar Nuevo Comisionado</h2>
+        <h2 id="com-titulo-form">👤 Registrar Nuevo Comisionado</h2>
         <form id="form-comisionado" onsubmit="guardarComisionado(event)">
+          <input type="hidden" id="com-id">
           <div class="form-group">
             <label>Nombre Completo:</label>
             <input type="text" id="com-nombre" required placeholder="Ej: Lucas González">
@@ -624,7 +626,10 @@
             <label>Teléfono / DNI (Opcional):</label>
             <input type="text" id="com-datos" placeholder="Ej: 3871234567">
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Guardar Comisionado</button>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" id="btn-submit-com" class="btn btn-primary btn-block">Guardar Comisionado</button>
+            <button type="button" onclick="resetFormComisionado()" class="btn btn-warning" style="display:none;" id="btn-cancel-com">Cancelar Edición</button>
+          </div>
         </form>
       </div>
 
@@ -723,7 +728,6 @@
       </div>
       <div style="display:flex; justify-content:space-between; text-align:center; margin-top:15px; font-size:1.2rem;">
         <div><small>Ventas Netas</small><br><b style="color:#27ae60" id="pl-ventas">$0</b></div>
-        <div><small>Costo Mercadería</small><br><b style="color:#e67e22" id="pl-cogs">$0</b></div>
         <div><small>Gastos Op. (Reales)</small><br><b style="color:#e74c3c" id="pl-gastos">$0</b></div>
         <div><small>Ganancia Neta</small><br><b style="color:#2980b9; font-size:1.5rem" id="pl-neta">$0</b></div>
       </div>
@@ -975,7 +979,12 @@
       const box = document.getElementById(`sug-${tipo}`);
       if(q.length < 2) return box.style.display = 'none';
       const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = '';
-      data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItem('${tipo}', ${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, '${p.imagen||''}', ${p.stock})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio}) [Stock: ${p.stock}]</div>`; });
+      data.forEach(p => { 
+        const imgHtml = p.imagen ? `<img src="${parseImg(p.imagen)}" style="width:35px;height:35px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;">` : `<span style="display:inline-block;width:35px;text-align:center;margin-right:8px;">📷</span>`;
+        box.innerHTML += `<div class="sug-item" onclick="agregarItem('${tipo}', ${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, '${p.imagen||''}', ${p.stock})">
+          ${imgHtml} <b>[${p.codigo_barras}]</b> - ${p.nombre} | $${p.precio} | Stock: <b>${p.stock}</b>
+        </div>`; 
+      });
       box.style.display = 'block';
     }
 
@@ -1171,7 +1180,13 @@
 
     function renderTablaInventario() {
       const catSel = document.getElementById('inv-cat-filter').value;
-      const prodsFiltrados = catSel ? productosMemoria.filter(p => p.categoria === catSel) : productosMemoria;
+      const q = (document.getElementById('inv-buscar-filter').value || '').toLowerCase();
+
+      const prodsFiltrados = productosMemoria.filter(p => {
+        if(catSel && p.categoria !== catSel) return false;
+        if(q && !p.nombre.toLowerCase().includes(q) && !p.codigo_barras.toLowerCase().includes(q)) return false;
+        return true;
+      });
 
       document.getElementById('tabla-inventario').innerHTML = prodsFiltrados.map(i => {
         const stockStr = i.stock < 0 ? `<b style="color:#e74c3c;">${i.stock} (A reingresar)</b>` : `<b>${i.stock}</b>`;
@@ -1345,6 +1360,7 @@
         document.getElementById('tabla-detalles-venta').innerHTML = data.items.map(i => `
           <tr>
             <td>${i.imagen ? `<img src="${parseImg(i.imagen)}" class="prod-img">` : '📷'}</td>
+            <td>${i.codigo_barras || i.codigo || '-'}</td>
             <td>${i.nombre}</td>
             <td><b>${i.cantidad}</b></td>
             <td>$${(i.cantidad * i.precio_unitario).toFixed(2)}</td>
@@ -1381,7 +1397,12 @@
       const box = document.getElementById('sug-editar-venta');
       if(q.length < 2) return box.style.display = 'none';
       const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = '';
-      data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAVenta(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; });
+      data.forEach(p => { 
+        const imgHtml = p.imagen ? `<img src="${parseImg(p.imagen)}" style="width:35px;height:35px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;">` : `<span style="display:inline-block;width:35px;text-align:center;margin-right:8px;">📷</span>`;
+        box.innerHTML += `<div class="sug-item" onclick="agregarItemAVenta(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})">
+          ${imgHtml} <b>[${p.codigo_barras}]</b> - ${p.nombre} | $${p.precio}
+        </div>`; 
+      });
       box.style.display = 'block';
     }
     async function agregarItemAVenta(id, nombre, precio) {
@@ -1482,6 +1503,7 @@
       document.getElementById('tabla-detalles-pedido').innerHTML = data.items.map(d => `
         <tr>
           <td>${d.imagen ? `<img src="${parseImg(d.imagen)}" class="prod-img">` : '📷'}</td>
+          <td>${d.codigo_barras || d.codigo || '-'}</td>
           <td>${d.nombre}</td>
           <td><b>${d.cantidad}</b></td>
           <td>$${(d.cantidad * d.precio_unitario).toFixed(2)}</td>
@@ -1509,7 +1531,21 @@
       verDetallesPedido(pedidoActivoModal); cargarPedidos(); cargarHistorialVentas(); cargarDevoluciones(); cargarInventario(); cargarReportes();
     }
 
-    async function buscarSugerenciasEditar(q) { const box = document.getElementById('sug-editar-pedido'); if(q.length < 2) return box.style.display = 'none'; const r = await fetch(`${API}/productos/buscar?q=${q}`); const data = await r.json(); box.innerHTML = ''; data.forEach(p => { box.innerHTML += `<div class="sug-item" onclick="agregarItemAPedido(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})"><b>${p.codigo_barras}</b> - ${p.nombre} ($${p.precio})</div>`; }); box.style.display = 'block'; }
+    async function buscarSugerenciasEditar(q) { 
+      const box = document.getElementById('sug-editar-pedido'); 
+      if(q.length < 2) return box.style.display = 'none'; 
+      const r = await fetch(`${API}/productos/buscar?q=${q}`); 
+      const data = await r.json(); 
+      box.innerHTML = ''; 
+      data.forEach(p => { 
+        const imgHtml = p.imagen ? `<img src="${parseImg(p.imagen)}" style="width:35px;height:35px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;">` : `<span style="display:inline-block;width:35px;text-align:center;margin-right:8px;">📷</span>`;
+        box.innerHTML += `<div class="sug-item" onclick="agregarItemAPedido(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})">
+          ${imgHtml} <b>[${p.codigo_barras}]</b> - ${p.nombre} | $${p.precio}
+        </div>`; 
+      }); 
+      box.style.display = 'block'; 
+    }
+    
     async function agregarItemAPedido(id, nombre, precio) { await fetch(`${API}/pedidos/${pedidoActivoModal}/agregar-item`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({producto_id: id, cantidad: 1, precio: precio})}); document.getElementById('buscar-editar-pedido').value = ''; document.getElementById('sug-editar-pedido').style.display = 'none'; cargarPedidos(); verDetallesPedido(pedidoActivoModal); cargarHistorialVentas(); cargarDevoluciones(); cargarReportes(); cargarInventario(); }
     
     async function cancelarPedidoTotal(id) { 
@@ -1523,7 +1559,15 @@
     
     function abrirSaldar(id, saldo) { pedidoA_Saldar = id; saldoA_Saldar = saldo; document.getElementById('s-titulo-saldo').innerText = `Saldo base a cubrir: $${saldo.toFixed(2)}`; resetCamposSplit('s'); calcS(); document.getElementById('modal-saldar').style.display = 'flex'; }
     async function confirmarSaldar() { const l = calcS(); if (Math.abs(l.falta) > 0.01) return await customAlert('Debes cubrir el monto exacto faltante.'); await fetch(`${API}/pedidos/${pedidoA_Saldar}/saldar`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pago_efectivo: l.tEf, pago_tarjeta: l.tTa, pago_transferencia: l.tTr, pago_qr: l.tQr, total_cobrado: l.total})}); document.getElementById('modal-saldar').style.display = 'none'; cargarPedidos(); cargarHistorialVentas(); cargarReportes(); }
-    async function cambiarEstadoPed(id, nuevoEstado, tracking='') { await fetch(`${API}/pedidos/${id}/estado`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({estado: nuevoEstado, tracking})}); cargarPedidos(); cargarHistorialVentas(); }
+    
+    async function cambiarEstadoPed(id, nuevoEstado, tracking='') { 
+      const res = await fetch(`${API}/pedidos/${id}/estado`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({estado: nuevoEstado, tracking})}); 
+      if(!res.ok){
+        const err = await res.json();
+        return await customAlert(err.error, "Bloqueo Automático por Stock");
+      }
+      cargarPedidos(); cargarHistorialVentas(); 
+    }
     async function marcarEnviado(id) { const tk = await customPrompt('Si tienes código de seguimiento, ingrésalo ahora:'); await cambiarEstadoPed(id, 'enviado', tk||''); }
 
     // HISTORIAL UNIFICADO Y AGRUPADO POR TRANSACCIÓN DE DEVOLUCIONES
@@ -1575,20 +1619,66 @@
       }
     }
 
+    function resetFormComisionado() {
+      document.getElementById('form-comisionado').reset();
+      document.getElementById('com-id').value = '';
+      document.getElementById('com-titulo-form').innerText = '👤 Registrar Nuevo Comisionado';
+      document.getElementById('btn-submit-com').innerText = 'Guardar Comisionado';
+      document.getElementById('btn-cancel-com').style.display = 'none';
+    }
+
+    function editarComisionado(id) {
+      const c = comisionadosMemoria.find(x => x.id === id);
+      if(!c) return;
+      document.getElementById('com-id').value = c.id;
+      document.getElementById('com-nombre').value = c.nombre;
+      document.getElementById('com-porcentaje').value = c.porcentaje;
+      document.getElementById('com-datos').value = c.datos || '';
+      
+      document.getElementById('com-titulo-form').innerText = '✏️ Editando Comisionado';
+      document.getElementById('btn-submit-com').innerText = 'Actualizar Datos';
+      document.getElementById('btn-cancel-com').style.display = 'block';
+    }
+
+    async function eliminarComisionado(id) {
+      if(!await customConfirm('¿Estás seguro de eliminar este comisionado? Se mantendrá el historial de sus ventas pero no podrá asignarse a nuevas.')) return;
+      await fetch(`${API}/comisionados/${id}`, { method: 'DELETE' });
+      await customAlert("Comisionado eliminado exitosamente.");
+      await cargarComisionadosSelects();
+      cargarComisiones();
+    }
+
+    async function anularPagoComision(id) {
+      if(!await customConfirm('¿Estás seguro de ANULAR este pago? El monto volverá a sumarse a la deuda del comisionado.')) return;
+      await fetch(`${API}/comisiones/pagos/${id}`, { method: 'DELETE' });
+      await customAlert("Pago anulado exitosamente.");
+      cargarComisiones();
+    }
+
     async function guardarComisionado(e) {
       e.preventDefault();
+      const id = document.getElementById('com-id').value;
       const nombre = document.getElementById('com-nombre').value;
       const porcentaje = parseFloat(document.getElementById('com-porcentaje').value);
       const datos = document.getElementById('com-datos').value;
 
-      await fetch(`${API}/comisionados`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, porcentaje, datos })
-      });
+      if(id) {
+        await fetch(`${API}/comisionados/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, porcentaje, datos })
+        });
+        await customAlert("Datos del comisionado actualizados.");
+      } else {
+        await fetch(`${API}/comisionados`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, porcentaje, datos })
+        });
+        await customAlert("Comisionado registrado exitosamente.");
+      }
 
-      document.getElementById('form-comisionado').reset();
-      await customAlert("Comisionado registrado exitosamente.");
+      resetFormComisionado();
       await cargarComisionadosSelects();
       cargarComisiones();
     }
@@ -1672,7 +1762,11 @@
         carpeta.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
             <div>
-              <h2 style="margin:0; color:#2c3e50;">📁 Carpeta: ${c.nombre}</h2>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <h2 style="margin:0; color:#2c3e50;">📁 Carpeta: ${c.nombre}</h2>
+                <button class="btn btn-warning" onclick="editarComisionado(${c.id})" style="padding:4px 8px; font-size:0.8rem; margin:0;">✏️ Editar</button>
+                <button class="btn btn-danger" onclick="eliminarComisionado(${c.id})" style="padding:4px 8px; font-size:0.8rem; margin:0;">🗑️ Eliminar</button>
+              </div>
               <small>Comisión asignada: <b>${c.porcentaje}%</b> ${c.datos ? '| ' + c.datos : ''}</small>
             </div>
             <div style="font-size:1.1rem;">
@@ -1711,6 +1805,7 @@
                 <th>% Com.</th>
                 <th>Comisión Generada</th>
                 <th>Pago / Adelanto</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -1741,7 +1836,8 @@
           precio: `$${parseFloat(v.precio_venta||0).toFixed(2)}`,
           porcentaje: `${v.porcentaje_aplicado}%`,
           comision: `<b style="color:#27ae60;">+$${parseFloat(v.monto_comision).toFixed(2)}</b>`,
-          pago: '-'
+          pago: '-',
+          accion: '-'
         });
       });
 
@@ -1755,13 +1851,14 @@
           precio: '-',
           porcentaje: '-',
           comision: '-',
-          pago: `<b style="color:#e74c3c;">-$${parseFloat(p.monto).toFixed(2)}</b>`
+          pago: `<b style="color:#e74c3c;">-$${parseFloat(p.monto).toFixed(2)}</b>`,
+          accion: `<button class="btn btn-danger" onclick="anularPagoComision(${p.id})" style="padding:2px 6px; font-size:0.7rem; margin:0;">Anular</button>`
         });
       });
 
       items.sort((a, b) => b.fecha - a.fecha);
 
-      if (items.length === 0) return '<tr><td colspan="8" style="text-align:center;">Sin movimientos registrados para este criterio.</td></tr>';
+      if (items.length === 0) return '<tr><td colspan="9" style="text-align:center;">Sin movimientos registrados para este criterio.</td></tr>';
 
       return items.map(i => `
         <tr>
@@ -1773,6 +1870,7 @@
           <td>${i.porcentaje}</td>
           <td>${i.comision}</td>
           <td>${i.pago}</td>
+          <td>${i.accion}</td>
         </tr>
       `).join('');
     }
@@ -1853,81 +1951,68 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td><b>(+) Total Ingresos por Ventas Netas:</b></td><td style="color:#27ae60; font-weight:bold; text-align:right;">$${r.totalVentas.toFixed(2)}</td></tr>
-              <tr><td><b>(-) Costo Directo de Mercadería Vendida (COGS):</b></td><td style="color:#e67e22; font-weight:bold; text-align:right;">-$${r.totalCostos.toFixed(2)}</td></tr>
-              <tr><td><b>(-) Gastos Operativos Reales:</b></td><td style="color:#e74c3c; font-weight:bold; text-align:right;">-$${r.totalEgresos.toFixed(2)}</td></tr>
+              <tr><td><b>(+) Total Ingresos por Ventas Netas:</b></td><td style="color:#27ae60; font-weight:bold; text-align:right;">$${(r.totalVentas || 0).toFixed(2)}</td></tr>
+              <tr><td><b>(-) Gastos Operativos Totales:</b></td><td style="color:#e74c3c; font-weight:bold; text-align:right;">-$${(r.totalEgresos || 0).toFixed(2)}</td></tr>
               <tr style="font-size: 1.2rem; background: #eef2f5;">
                 <td><b>(=) RESULTADO OPERATIVO NETO:</b></td>
-                <td style="color:${r.resultadoOperativo >= 0 ? '#2980b9' : '#e74c3c'}; font-weight:bold; text-align:right;">$${r.resultadoOperativo.toFixed(2)}</td>
+                <td style="color:${(r.resultadoOperativo || 0) >= 0 ? '#2980b9' : '#e74c3c'}; font-weight:bold; text-align:right;">$${(r.resultadoOperativo || 0).toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
 
-          <h3 style="color: #2c3e50; margin-bottom: 10px;">2. Detalle Itemizado de Ventas</h3>
-      `;
-
-      if (data.ventas.length === 0) {
-        html += `<p style="color:#777; margin-bottom:20px;">No hay ventas registradas en el periodo seleccionado.</p>`;
-      } else {
-        data.ventas.forEach(v => {
-          const metodos = [];
-          if (v.pago_efectivo > 0) metodos.push(`Efectivo: $${v.pago_efectivo.toFixed(2)}`);
-          if (v.pago_tarjeta > 0) metodos.push(`Tarjeta: $${v.pago_tarjeta.toFixed(2)}`);
-          if (v.pago_transferencia > 0) metodos.push(`Transf: $${v.pago_transferencia.toFixed(2)}`);
-          if (v.pago_qr > 0) metodos.push(`QR: $${v.pago_qr.toFixed(2)}`);
-
-          html += `
-            <div style="border: 1px solid #e2e8f0; margin-bottom: 15px; border-radius: 6px; padding: 10px;">
-              <div style="display: flex; justify-content: space-between; background: #eef2f5; padding: 6px 10px; font-weight: bold;">
-                <span>Venta #${v.id} - Cliente: ${v.cliente} (${formatearFecha24hs(v.fecha)})</span>
-                <span style="color:#27ae60;">Total: $${v.total.toFixed(2)}</span>
-              </div>
-              <p style="font-size: 0.85rem; padding: 5px 10px; color: #555;"><b>Métodos de cobro:</b> ${metodos.join(' | ') || 'Efectivo'}</p>
-              <table style="font-size: 0.85rem; margin-top: 5px;">
-                <thead>
-                  <tr><th>Código</th><th>Producto Vendido</th><th>Cantidad</th><th>Precio Unit.</th><th>Costo Unit.</th><th>Subtotal</th></tr>
-                </thead>
+          <div class="grid-2" style="margin-bottom: 25px;">
+            <div>
+              <h3 style="color: #2c3e50; margin-bottom: 10px;">Desglose de Ventas por Categoría</h3>
+              <table style="font-size: 0.85rem;">
+                <thead><tr><th>Categoría</th><th>Total Facturado</th></tr></thead>
                 <tbody>
-                  ${v.items.map(i => `
-                    <tr>
-                      <td>${i.codigo}</td>
-                      <td>${i.producto}</td>
-                      <td><b>${i.cantidad}</b></td>                       <td>$${i.precio_unitario.toFixed(2)}</td>
-                      <td>$${i.costo_unitario.toFixed(2)}</td>                       <td>$${i.subtotal.toFixed(2)}</td>
-                    </tr>
-                  `).join('')}
+                  ${r.desgloseVentasCat ? Object.entries(r.desgloseVentasCat).map(([cat, m]) => `<tr><td>${cat}</td><td style="font-weight:bold;color:#27ae60;">$${m.toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="2">Sin datos</td></tr>'}
                 </tbody>
               </table>
             </div>
-          `;
-        });
-      }
+            <div>
+              <h3 style="color: #2c3e50; margin-bottom: 10px;">Desglose de Gastos por Categoría</h3>
+              <table style="font-size: 0.85rem;">
+                <thead><tr><th>Categoría</th><th>Total Gastado</th></tr></thead>
+                <tbody>
+                  ${r.desgloseGastosCat ? Object.entries(r.desgloseGastosCat).map(([cat, m]) => `<tr><td>${cat}</td><td style="font-weight:bold;color:#e74c3c;">$${m.toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="2">Sin datos</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      html += `<h3 style="color: #2c3e50; margin-top: 25px; margin-bottom: 10px;">3. Detalle Itemizado de Gastos Operativos</h3>`;
-
-      if (data.egresos.length === 0) {
-        html += `<p style="color:#777;">No hay egresos registrados en el periodo seleccionado.</p>`;
-      } else {
-        html += `
-          <table style="font-size: 0.85rem;">
-            <thead>
-              <tr><th>Fecha</th><th>Categoría</th><th>Concepto / Detalle</th><th>Método de Pago</th><th>Monto ($)</th></tr>
-            </thead>
+          <h3 style="color: #2c3e50; margin-bottom: 10px;">Desglose de Productos Vendidos</h3>
+          <table style="font-size: 0.85rem; margin-bottom: 25px;">
+            <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th>Unidades</th><th>Total Facturado</th></tr></thead>
             <tbody>
-              ${data.egresos.map(e => `
+              ${r.desgloseProdsCat ? Object.entries(r.desgloseProdsCat).map(([sku, info]) => `
                 <tr>
-                  <td>${formatearFecha24hs(e.fecha)}</td>
-                  <td><b>${e.categoria}</b></td>
-                  <td>${e.concepto}</td>
-                  <td>${e.metodo_pago}</td>                   <td style="color:#e74c3c; font-weight:bold;">-$${e.monto.toFixed(2)}</td>
+                  <td>${sku}</td>
+                  <td>${info.nombre}</td>
+                  <td>${info.categoria || '-'}</td>
+                  <td><b>${info.unidades}</b></td>
+                  <td>$${info.facturado.toFixed(2)}</td>
                 </tr>
-              `).join('')}
+              `).join('') : '<tr><td colspan="5">Sin datos</td></tr>'}
             </tbody>
           </table>
-        `;
-      }
 
-      html += `</div>`;
+          <h3 style="color: #2c3e50; margin-bottom: 10px;">Top 10 Mayores Gastos del Periodo</h3>
+          <table style="font-size: 0.85rem; margin-bottom: 25px;">
+            <thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Monto</th></tr></thead>
+            <tbody>
+              ${r.topGastos ? r.topGastos.map(g => `
+                <tr>
+                  <td>${formatearFecha24hs(g.fecha)}</td>
+                  <td>${g.categoria}</td>
+                  <td>${g.concepto}</td>
+                  <td style="color:#e74c3c; font-weight:bold;">-$${g.monto.toFixed(2)}</td>
+                </tr>
+              `).join('') : '<tr><td colspan="4">Sin datos</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      `;
 
       document.getElementById('contenido-informe').innerHTML = html;
       document.getElementById('modal-informe-detallado').style.display = 'flex';
@@ -1936,7 +2021,7 @@
     // REPORTES Y HISTORIAL CAJA
     async function cargarReportes() {
       const mes = document.getElementById('mes-filtro').value; const r = await fetch(`${API}/reportes/dashboard?mes=${mes}`); const d = await r.json();
-      document.getElementById('pl-ventas').innerText = `$${d.pl.ventas.toFixed(2)}`; document.getElementById('pl-cogs').innerText = `$${d.pl.cogs.toFixed(2)}`; document.getElementById('pl-gastos').innerText = `$${d.pl.gastos.toFixed(2)}`; document.getElementById('pl-neta').innerText = `$${d.pl.neta.toFixed(2)}`;
+      document.getElementById('pl-ventas').innerText = `$${d.pl.ventas.toFixed(2)}`; document.getElementById('pl-gastos').innerText = `$${d.pl.gastos.toFixed(2)}`; document.getElementById('pl-neta').innerText = `$${d.pl.neta.toFixed(2)}`;
       
       cargarHistorialCaja();
       
